@@ -1,0 +1,456 @@
+var STORAGE_KEY = "evse_config";
+var state = null;
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────
+
+function init() {
+  state = loadConfig();
+  render();
+  document.getElementById("save-btn").addEventListener("click", save);
+  document.getElementById("reset-btn").addEventListener("click", resetToDefaults);
+}
+
+function loadConfig() {
+  var stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    try { return JSON.parse(stored); } catch (e) {}
+  }
+  return defaultConfig();
+}
+
+function defaultConfig() {
+  return {
+    handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
+    locations: (typeof LOCATIONS !== "undefined")
+      ? JSON.parse(JSON.stringify(LOCATIONS))
+      : []
+  };
+}
+
+function emptyLocation() {
+  return { id: "", cpo: "electromaps", displayName: "", rules: null, connectors: [] };
+}
+
+function emptyConnector() {
+  return { id: "", displayName: "" };
+}
+
+// ── HTML helpers ──────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function field(id, label, inputHtml, hint) {
+  return '<div class="s-field">' +
+    '<label class="s-label">' + label + '</label>' +
+    inputHtml +
+    (hint ? '<span class="s-hint">' + esc(hint) + '</span>' : '') +
+    '<span class="s-error" data-err="' + id + '"></span>' +
+  '</div>';
+}
+
+function input(id, value, opts) {
+  opts = opts || {};
+  return '<input class="s-input" type="' + (opts.type || "text") + '"' +
+    ' data-fid="' + id + '"' +
+    ' value="' + esc(value) + '"' +
+    (opts.placeholder ? ' placeholder="' + esc(opts.placeholder) + '"' : '') +
+    (opts.min !== undefined ? ' min="' + opts.min + '"' : '') +
+    (opts.max !== undefined ? ' max="' + opts.max + '"' : '') +
+    (opts.step ? ' step="' + opts.step + '"' : '') +
+    '>';
+}
+
+function getCpoOptions(selected) {
+  var adapters = window.ADAPTERS || {};
+  return Object.keys(adapters).map(function(key) {
+    var label = key.charAt(0).toUpperCase() + key.slice(1);
+    return '<option value="' + esc(key) + '"' + (key === selected ? " selected" : "") + '>' + esc(label) + '</option>';
+  }).join("");
+}
+
+function hasCapability(cpo, cap) {
+  var adapter = window.ADAPTERS && window.ADAPTERS[cpo];
+  return adapter && adapter.capabilities && adapter.capabilities.indexOf(cap) >= 0;
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+
+function render() {
+  document.body.classList.toggle("left-handed", state.handedness === "left");
+  document.getElementById("form-root").innerHTML = buildGlobal() + buildLocations();
+  bindFormEvents();
+}
+
+function buildGlobal() {
+  var handOpts = [
+    { value: "right", label: "Right-handed (controls on left)" },
+    { value: "left",  label: "Left-handed (controls on right)" }
+  ].map(function(o) {
+    return '<option value="' + o.value + '"' + (state.handedness === o.value ? " selected" : "") + '>' + o.label + '</option>';
+  }).join("");
+
+  return '<section class="s-section">' +
+    '<h2 class="s-section-title">Display</h2>' +
+    '<div class="s-field">' +
+      '<label class="s-label">Controls side</label>' +
+      '<select class="s-input s-select" id="g-handedness">' + handOpts + '</select>' +
+    '</div>' +
+  '</section>';
+}
+
+function buildLocations() {
+  var locCards = state.locations.map(buildLocation).join("");
+  var noLocError = '<span class="s-error" data-err="no-locations"></span>';
+  return '<section class="s-section">' +
+    '<div class="s-section-header">' +
+      '<h2 class="s-section-title">Locations</h2>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn btn-ghost" id="add-manual-btn">Add manually</button>' +
+        '<button class="btn btn-primary" id="add-loc-btn">Find nearby</button>' +
+      '</div>' +
+    '</div>' +
+    noLocError +
+    locCards +
+  '</section>';
+}
+
+function buildLocation(loc, li) {
+  var rules = loc.rules || {};
+  var maxDur = rules.maxChargeDuration || null;
+  var notCharging = !!rules.mustLeaveWhenNotCharging;
+  var freeChg = rules.freeCharging || null;
+  var notChargingCapWarning = !hasCapability(loc.cpo, "CONNECTED_NOT_CHARGING")
+    ? '<span class="s-cap-warn">not supported by ' + esc(loc.cpo) + '</span>' : "";
+
+  var leftCol =
+    field("loc-" + li + "-displayName", "Display name",
+      input("loc-" + li + "-displayName", loc.displayName, { placeholder: "e.g. Moli" })) +
+
+    '<div class="s-field-row">' +
+      '<div class="s-field">' +
+        '<label class="s-label">CPO</label>' +
+        '<select class="s-input s-select loc-cpo-select" data-li="' + li + '" data-fid="loc-' + li + '-cpo">' +
+          getCpoOptions(loc.cpo) +
+        '</select>' +
+        '<span class="s-error" data-err="loc-' + li + '-cpo"></span>' +
+      '</div>' +
+      '<div class="s-field">' +
+        field("loc-" + li + "-id", "Location ID",
+          input("loc-" + li + "-id", loc.id, { placeholder: "e.g. 42479" })) +
+      '</div>' +
+    '</div>' +
+
+    '<h4 class="s-subsection-title">Rules</h4>' +
+
+    '<div class="s-rule-row' + (maxDur ? " enabled" : "") + '" data-rule="maxChargeDuration">' +
+      '<label class="s-rule-label">' +
+        '<input class="s-checkbox rule-toggle" type="checkbox"' + (maxDur ? " checked" : "") + '> ' +
+        'Max charge duration' +
+      '</label>' +
+      '<div class="s-rule-inputs">' +
+        '<input class="s-input s-input-narrow" type="number" data-fid="loc-' + li + '-maxDuration-hours"' +
+          ' value="' + esc(maxDur ? maxDur.hours : 4) + '" min="0.5" step="0.5" placeholder="hrs">' +
+        '<span class="s-unit">h</span>' +
+        '<span class="s-error" data-err="loc-' + li + '-maxDuration-hours"></span>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="s-rule-subrow' + (freeChg ? " enabled" : "") + '" data-rule="freeCharging">' +
+      '<label class="s-rule-label">' +
+        '<input class="s-checkbox rule-toggle" type="checkbox"' + (freeChg ? " checked" : "") + '> ' +
+        'No limit during:' +
+      '</label>' +
+      '<div class="s-rule-inputs">' +
+        '<input class="s-input s-input-time" type="time" data-fid="loc-' + li + '-freeStart"' +
+          ' value="' + esc(freeChg ? freeChg.start : "22:00") + '">' +
+        '<span class="s-unit">to</span>' +
+        '<input class="s-input s-input-time" type="time" data-fid="loc-' + li + '-freeEnd"' +
+          ' value="' + esc(freeChg ? freeChg.end : "08:00") + '">' +
+        '<span class="s-error" data-err="loc-' + li + '-freeCharging"></span>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="s-rule-row' + (notCharging ? " enabled" : "") + '" data-rule="mustLeaveWhenNotCharging">' +
+      '<label class="s-rule-label">' +
+        '<input class="s-checkbox rule-toggle" type="checkbox"' + (notCharging ? " checked" : "") + '> ' +
+        'Must leave when not charging' +
+      '</label>' +
+      notChargingCapWarning +
+    '</div>';
+
+  var rightCol =
+    '<span class="s-error" data-err="loc-' + li + '-connectors"></span>' +
+    buildConnectors(loc, li) +
+    '<button class="btn btn-ghost add-conn-btn" data-li="' + li + '">+ Add connector</button>';
+
+  var total = state.locations.length;
+  return '<div class="s-card loc-card" data-li="' + li + '">' +
+    '<div class="s-card-header">' +
+      '<h3 class="s-card-title">Location ' + (li + 1) + '</h3>' +
+      '<div style="display:flex;gap:6px;align-items:center">' +
+        '<button class="btn btn-ghost btn-icon move-up-btn" data-li="' + li + '" ' + (li === 0 ? 'disabled' : '') + '>↑</button>' +
+        '<button class="btn btn-ghost btn-icon move-down-btn" data-li="' + li + '" ' + (li === total - 1 ? 'disabled' : '') + '>↓</button>' +
+        '<button class="btn btn-danger remove-loc-btn" data-li="' + li + '">Remove</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="loc-columns">' +
+      '<div class="loc-col-settings">' + leftCol + '</div>' +
+      '<div class="loc-col-connectors">' +
+        '<h4 class="s-subsection-title" style="margin-top:0">Connectors</h4>' +
+        rightCol +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function buildConnectors(loc, li) {
+  return loc.connectors.map(function(conn, ci) {
+    return buildConnector(conn, li, ci);
+  }).join("");
+}
+
+function buildConnector(conn, li, ci) {
+  return '<div class="s-conn-row conn-row" data-li="' + li + '" data-ci="' + ci + '">' +
+    '<div class="s-field">' +
+      '<label class="s-label">Connector ID</label>' +
+      input("loc-" + li + "-conn-" + ci + "-id", conn.id, { placeholder: "e.g. 114172" }) +
+      '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-id"></span>' +
+    '</div>' +
+    '<div class="s-field">' +
+      '<label class="s-label">Display name</label>' +
+      input("loc-" + li + "-conn-" + ci + "-name", conn.displayName, { placeholder: "e.g. Charger 1 plug B" }) +
+      '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-name"></span>' +
+    '</div>' +
+    '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '">×</button>' +
+  '</div>';
+}
+
+// ── Events ────────────────────────────────────────────────────────────────
+
+function bindFormEvents() {
+  document.getElementById("g-handedness").addEventListener("change", function() {
+    state.handedness = this.value;
+    document.body.classList.toggle("left-handed", this.value === "left");
+  });
+
+  document.getElementById("add-loc-btn").addEventListener("click", function() {
+    collectIntoState();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.location.href = "discover.html";
+  });
+
+  document.getElementById("add-manual-btn").addEventListener("click", function() {
+    collectIntoState();
+    state.locations.push(emptyLocation());
+    render();
+    document.querySelector('.loc-card:last-child').scrollIntoView({ behavior: "smooth" });
+  });
+
+  document.querySelectorAll(".remove-loc-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      collectIntoState();
+      state.locations.splice(li, 1);
+      render();
+    });
+  });
+
+  document.querySelectorAll(".move-up-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      if (li === 0) return;
+      collectIntoState();
+      var tmp = state.locations[li - 1];
+      state.locations[li - 1] = state.locations[li];
+      state.locations[li] = tmp;
+      render();
+    });
+  });
+
+  document.querySelectorAll(".move-down-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      if (li >= state.locations.length - 1) return;
+      collectIntoState();
+      var tmp = state.locations[li + 1];
+      state.locations[li + 1] = state.locations[li];
+      state.locations[li] = tmp;
+      render();
+    });
+  });
+
+  document.querySelectorAll(".add-conn-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      collectIntoState();
+      state.locations[li].connectors.push(emptyConnector());
+      render();
+      // Focus the new connector's ID field
+      var cards = document.querySelectorAll(".loc-card");
+      var lastRow = cards[li].querySelector(".conn-row:last-of-type");
+      if (lastRow) lastRow.querySelector(".s-input").focus();
+    });
+  });
+
+  document.querySelectorAll(".remove-conn-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      var ci = +this.dataset.ci;
+      collectIntoState();
+      state.locations[li].connectors.splice(ci, 1);
+      render();
+    });
+  });
+
+  document.querySelectorAll(".loc-cpo-select").forEach(function(sel) {
+    sel.addEventListener("change", function() {
+      var li = +this.dataset.li;
+      collectIntoState();
+      state.locations[li].cpo = this.value;
+      render();
+    });
+  });
+
+  document.querySelectorAll(".rule-toggle").forEach(function(cb) {
+    cb.addEventListener("change", function() {
+      var row = this.closest(".s-rule-row") || this.closest(".s-rule-subrow");
+      row.classList.toggle("enabled", this.checked);
+    });
+  });
+}
+
+// ── Collect form → state ──────────────────────────────────────────────────
+
+function collectIntoState() {
+  var handEl = document.getElementById("g-handedness");
+  if (handEl) state.handedness = handEl.value;
+
+  document.querySelectorAll(".loc-card").forEach(function(card) {
+    var li = +card.dataset.li;
+    var loc = state.locations[li];
+    if (!loc) return;
+
+    loc.displayName = card.querySelector('[data-fid="loc-' + li + '-displayName"]').value;
+    loc.cpo = card.querySelector('[data-fid="loc-' + li + '-cpo"]').value;
+    loc.id = card.querySelector('[data-fid="loc-' + li + '-id"]').value;
+
+    var rules = {};
+
+    var maxDurRow = card.querySelector('.s-rule-row[data-rule="maxChargeDuration"]');
+    if (maxDurRow && maxDurRow.classList.contains("enabled")) {
+      var h = parseFloat(card.querySelector('[data-fid="loc-' + li + '-maxDuration-hours"]').value);
+      rules.maxChargeDuration = { hours: isNaN(h) ? 0 : h };
+    }
+    var freeChgRow = card.querySelector('.s-rule-subrow[data-rule="freeCharging"]');
+    if (freeChgRow && freeChgRow.classList.contains("enabled")) {
+      rules.freeCharging = {
+        start: card.querySelector('[data-fid="loc-' + li + '-freeStart"]').value || "22:00",
+        end:   card.querySelector('[data-fid="loc-' + li + '-freeEnd"]').value || "08:00"
+      };
+    }
+    var notChargingRow = card.querySelector('.s-rule-row[data-rule="mustLeaveWhenNotCharging"]');
+    if (notChargingRow && notChargingRow.classList.contains("enabled")) {
+      rules.mustLeaveWhenNotCharging = true;
+    }
+    loc.rules = Object.keys(rules).length > 0 ? rules : null;
+
+    loc.connectors = [];
+    card.querySelectorAll(".conn-row").forEach(function(row, ci) {
+      loc.connectors.push({
+        id:          card.querySelector('[data-fid="loc-' + li + '-conn-' + ci + '-id"]').value,
+        displayName: card.querySelector('[data-fid="loc-' + li + '-conn-' + ci + '-name"]').value
+      });
+    });
+  });
+}
+
+// ── Validation ────────────────────────────────────────────────────────────
+
+function validate(cfg) {
+  var errors = {};
+
+  if (cfg.locations.length === 0) {
+    errors["no-locations"] = "At least one location is required";
+    return errors;
+  }
+
+  cfg.locations.forEach(function(loc, li) {
+    if (!loc.displayName.trim())
+      errors["loc-" + li + "-displayName"] = "Required";
+    if (!loc.id.trim())
+      errors["loc-" + li + "-id"] = "Required";
+
+    if (loc.connectors.length === 0)
+      errors["loc-" + li + "-connectors"] = "At least one connector required";
+
+    loc.connectors.forEach(function(conn, ci) {
+      if (!conn.id.trim())
+        errors["loc-" + li + "-conn-" + ci + "-id"] = "Required";
+      if (!conn.displayName.trim())
+        errors["loc-" + li + "-conn-" + ci + "-name"] = "Required";
+    });
+
+    if (loc.rules) {
+      if (loc.rules.maxChargeDuration) {
+        var h = loc.rules.maxChargeDuration.hours;
+        if (!h || h <= 0)
+          errors["loc-" + li + "-maxDuration-hours"] = "Must be greater than 0";
+      }
+      if (loc.rules.freeCharging) {
+        var timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
+        var s = loc.rules.freeCharging.start;
+        var e = loc.rules.freeCharging.end;
+        if (!timeRe.test(s) || !timeRe.test(e))
+          errors["loc-" + li + "-freeCharging"] = "Enter valid times (HH:MM)";
+        else if (s === e)
+          errors["loc-" + li + "-freeCharging"] = "Start and end must differ";
+      }
+    }
+  });
+
+  return errors;
+}
+
+function showErrors(errors) {
+  Object.keys(errors).forEach(function(key) {
+    var errEl = document.querySelector('[data-err="' + key + '"]');
+    if (errEl) errEl.textContent = errors[key];
+    var fieldEl = document.querySelector('[data-fid="' + key + '"]');
+    if (fieldEl) fieldEl.classList.add("field-error");
+  });
+
+  var first = document.querySelector(".s-error:not(:empty)");
+  if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function clearErrors() {
+  document.querySelectorAll(".s-error").forEach(function(el) { el.textContent = ""; });
+  document.querySelectorAll(".field-error").forEach(function(el) { el.classList.remove("field-error"); });
+}
+
+// ── Save / reset ──────────────────────────────────────────────────────────
+
+function save() {
+  collectIntoState();
+  clearErrors();
+  var errors = validate(state);
+  if (Object.keys(errors).length > 0) {
+    showErrors(errors);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  window.location.href = "index.html";
+}
+
+function resetToDefaults() {
+  if (!confirm("Reset all settings to the built-in defaults from config.js?")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = defaultConfig();
+  render();
+}
+
+document.addEventListener("DOMContentLoaded", init);

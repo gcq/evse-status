@@ -1,0 +1,299 @@
+var REFRESH_INTERVAL = 60;  // seconds
+var refreshTimer = null;
+var countdown = REFRESH_INTERVAL;
+var countdownTimer = null;
+
+var CONNECTOR_TYPE_LABELS = {
+  IEC_62196_T2: "Type 2",
+  IEC_62196_T2_COMBO: "CCS",
+  CHADEMO: "CHAdeMO",
+  DOMESTIC_E: "Schuko"
+};
+
+var STATUS_LABELS = {
+  AVAILABLE: "Available",
+  OCCUPIED: "Occupied",
+  CONNECTED_NOT_CHARGING: "Connected",
+  OUT_OF_SERVICE: "Out of service",
+  WORKING: "Working",
+  UNKNOWN: "Unknown"
+};
+
+var STATUS_CLASSES = {
+  AVAILABLE: "status-available",
+  OCCUPIED: "status-occupied",
+  CONNECTED_NOT_CHARGING: "status-occupied",
+  OUT_OF_SERVICE: "status-oos",
+  WORKING: "status-unknown",
+  UNKNOWN: "status-unknown"
+};
+
+function computeLimits(connector, rules, capabilities) {
+  var limits = [];
+  if (!rules || !capabilities) return limits;
+
+  if (rules.mustLeaveWhenNotCharging &&
+      capabilities.indexOf("CONNECTED_NOT_CHARGING") >= 0 &&
+      connector.status === "CONNECTED_NOT_CHARGING") {
+    limits.push({
+      type: "mustLeaveWhenNotCharging",
+      deadline: 0,
+      sessionMinutes: connector.sessionMinutes || null,
+      sessionEnergyWh: connector.sessionEnergyWh || null,
+      sessionUserName: connector.sessionUserName || null
+    });
+  }
+
+  if (rules.maxChargeDuration &&
+      capabilities.indexOf("CHARGE_START_TIME") >= 0 &&
+      connector.status === "OCCUPIED" &&
+      connector.statusUpdatedAt) {
+    var deadline = new Date(connector.statusUpdatedAt).getTime() +
+                   rules.maxChargeDuration.hours * 3600000;
+    limits.push({ type: "maxChargeDuration", deadline: deadline });
+  }
+
+  return limits;
+}
+
+function renderLimitBadge(limit) {
+  var remaining = limit.deadline - Date.now();
+  if (remaining <= 0) {
+    var lines = [];
+    if (limit.sessionUserName) lines.push(limit.sessionUserName);
+    if (limit.sessionMinutes != null) {
+      var h = Math.floor(limit.sessionMinutes / 60);
+      var m = limit.sessionMinutes % 60;
+      var timeStr = h > 0 ? h + "h " + (m < 10 ? "0" : "") + m + "m" : m + "m";
+      var kwh = limit.sessionEnergyWh != null ? " · " + (limit.sessionEnergyWh / 1000).toFixed(1) + " kWh" : "";
+      lines.push(timeStr + kwh);
+    }
+    return '<div class="limit-badge-wrap">' +
+      '<span class="limit-badge limit-overdue">MUST LEAVE</span>' +
+      lines.map(function(l) { return '<span class="limit-detail">' + l + '</span>'; }).join("") +
+    '</div>';
+  }
+  var mins = Math.floor(remaining / 60000);
+  var hours = Math.floor(mins / 60);
+  mins = mins % 60;
+  var text = hours > 0
+    ? "Leave in " + hours + "h " + (mins < 10 ? "0" : "") + mins + "m"
+    : "Leave in " + mins + "m";
+  var cls = remaining < 30 * 60000 ? "limit-urgent" : "limit-ok";
+  return '<span class="limit-badge ' + cls + '">' + text + '</span>';
+}
+
+function formatRelativeTime(isoString) {
+  if (!isoString) return "unknown";
+  var diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (diff < 60) return diff + "s ago";
+  if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+  return Math.floor(diff / 86400) + "d ago";
+}
+
+function getAdapter(cpo) {
+  return window.ADAPTERS && window.ADAPTERS[cpo];
+}
+
+async function fetchLocation(locConfig) {
+  var adapter = getAdapter(locConfig.cpo);
+  if (!adapter) throw new Error("No adapter for CPO: " + locConfig.cpo);
+
+  var data = await adapter.fetchLocation(
+    locConfig.id,
+    locConfig.connectors.map(function(c) { return c.id; })
+  );
+
+  var displayNameMap = {};
+  locConfig.connectors.forEach(function(c) { displayNameMap[c.id] = c.displayName; });
+
+  return {
+    displayName: locConfig.displayName,
+    id: data.id,
+    cpoKey: locConfig.cpo,
+    cpo: data.cpo,
+    address: data.address,
+    realtime: data.realtime,
+    updatedAt: data.updatedAt,
+    rules: locConfig.rules || null,
+    error: null,
+    connectors: data.connectors.map(function(c) {
+      return Object.assign({}, c, {
+        displayName: displayNameMap[c.id] || c.visualRef || c.id
+      });
+    })
+  };
+}
+
+function renderConnector(connector, context) {
+  var statusClass = STATUS_CLASSES[connector.status] || "status-unknown";
+  var statusLabel = STATUS_LABELS[connector.status] || connector.status;
+  var typeLabel = CONNECTOR_TYPE_LABELS[connector.type] || connector.type;
+  var notLive = connector.realtime === false
+    ? '<span class="not-live" title="Status not updated in real time">not live</span>'
+    : "";
+
+  var limitBadgesHtml = "";
+  if (context) {
+    var limits = computeLimits(connector, context.rules, context.capabilities);
+    limitBadgesHtml = limits.map(renderLimitBadge).join("");
+  }
+
+  // DOM order inside .connector-status (flex-direction: row-reverse reverses visual order):
+  // DOM: [status-badge][not-live?][time][limit-badge]
+  // Visual: [limit-badge][time][not-live?][status-badge]
+  return '<div class="connector">' +
+    '<div class="connector-info">' +
+      '<span class="connector-name">' + connector.displayName + '</span>' +
+      '<span class="connector-type">' + typeLabel + (connector.kw != null ? ' &middot; ' + connector.kw + ' kW' : '') + '</span>' +
+    '</div>' +
+    '<div class="connector-status">' +
+      '<span class="status-badge ' + statusClass + '">' + statusLabel + '</span>' +
+      notLive +
+      (connector.statusUpdatedAt ? '<span class="status-time">' + formatRelativeTime(connector.statusUpdatedAt) + '</span>' : '') +
+      limitBadgesHtml +
+    '</div>' +
+  '</div>';
+}
+
+function renderCardSkeleton(loc) {
+  var connSkeleton = loc.connectors.map(function(c) {
+    return '<div class="connector">' +
+      '<div class="connector-info">' +
+        '<span class="connector-name">' + (c.displayName || c.id) + '</span>' +
+        '<span class="skeleton-line" style="width:90px"></span>' +
+      '</div>' +
+      '<div class="connector-status">' +
+        '<span class="skeleton-badge"></span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  return '<div class="card">' +
+    '<div class="card-header">' +
+      '<span class="location-name">' + loc.displayName + '</span>' +
+      '<span class="cpo-badge">' + loc.cpo + '</span>' +
+    '</div>' +
+    '<div class="location-address"><span class="skeleton-line" style="width:140px"></span></div>' +
+    '<div class="connectors">' + connSkeleton + '</div>' +
+  '</div>';
+}
+
+function renderCard(location) {
+  if (location.error) {
+    return '<div class="card card-error">' +
+      '<div class="card-header"><span class="location-name">' + location.displayName + '</span></div>' +
+      '<div class="card-error-msg">' + location.error + '</div>' +
+    '</div>';
+  }
+
+  var adapter = getAdapter(location.cpoKey) || {};
+  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
+  var connectorsHtml = location.connectors.map(function(c) {
+    return renderConnector(c, context);
+  }).join('');
+
+  return '<div class="card">' +
+    '<div class="card-header">' +
+      '<span class="location-name">' + location.displayName + '</span>' +
+      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
+    '</div>' +
+    (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
+    '<div class="connectors">' + connectorsHtml + '</div>' +
+  '</div>';
+}
+
+function setLoading(isLoading) {
+  var btn = document.getElementById("refresh-btn");
+  btn.disabled = isLoading;
+  btn.textContent = isLoading ? "Refreshing…" : "Refresh now";
+}
+
+function updateCountdown() {
+  var el = document.getElementById("countdown");
+  if (el) el.textContent = countdown;
+}
+
+function startCountdown() {
+  countdown = REFRESH_INTERVAL;
+  updateCountdown();
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(function() {
+    countdown = Math.max(0, countdown - 1);
+    updateCountdown();
+  }, 1000);
+}
+
+async function refresh() {
+  setLoading(true);
+  clearInterval(countdownTimer);
+
+  var container = document.getElementById("cards");
+  var isFirstLoad = !document.getElementById("card-slot-0");
+
+  if (isFirstLoad) {
+    // First load: render skeletons so the page isn't blank
+    container.innerHTML = LOCATIONS.map(function(loc, i) {
+      return '<div id="card-slot-' + i + '">' + renderCardSkeleton(loc) + '</div>';
+    }).join("");
+  } else {
+    // Re-refresh: ensure slots exist and dim existing cards to signal staleness
+    LOCATIONS.forEach(function(loc, i) {
+      var slot = document.getElementById("card-slot-" + i);
+      if (!slot) {
+        var div = document.createElement("div");
+        div.id = "card-slot-" + i;
+        div.innerHTML = renderCardSkeleton(loc);
+        container.appendChild(div);
+      } else {
+        slot.style.opacity = "0.5";
+      }
+    });
+  }
+
+  var pending = LOCATIONS.length;
+  function oneDone() {
+    pending--;
+    if (pending === 0) {
+      document.getElementById("last-updated-time").textContent = new Date().toLocaleTimeString();
+      setLoading(false);
+      startCountdown();
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+    }
+  }
+
+  LOCATIONS.forEach(function(loc, i) {
+    fetchLocation(loc).then(function(result) {
+      var slot = document.getElementById("card-slot-" + i);
+      if (slot) { slot.innerHTML = renderCard(result); slot.style.opacity = ""; }
+      oneDone();
+    }).catch(function(e) {
+      var slot = document.getElementById("card-slot-" + i);
+      if (slot) { slot.innerHTML = renderCard({ displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] }); slot.style.opacity = ""; }
+      oneDone();
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  var stored = localStorage.getItem("evse_config");
+  if (stored) {
+    try {
+      var cfg = JSON.parse(stored);
+      if (cfg.handedness) HANDEDNESS = cfg.handedness;
+      if (cfg.locations)  LOCATIONS  = cfg.locations;
+    } catch (e) {}
+  }
+
+  if (typeof HANDEDNESS !== "undefined" && HANDEDNESS === "left") {
+    document.body.classList.add("left-handed");
+  }
+
+  document.getElementById("refresh-btn").addEventListener("click", function() {
+    clearTimeout(refreshTimer);
+    refresh();
+  });
+
+  refresh();
+});
