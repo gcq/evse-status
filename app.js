@@ -370,6 +370,8 @@ document.addEventListener("DOMContentLoaded", function() {
     document.body.classList.add("left-handed");
   }
 
+  document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "light");
+
   document.getElementById("refresh-btn").addEventListener("click", function() {
     clearTimeout(refreshTimer);
     refresh();

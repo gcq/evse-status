@@ -21,6 +21,7 @@ function loadConfig() {
 function defaultConfig() {
   return {
     handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
+    theme: "light",
     locations: (typeof LOCATIONS !== "undefined")
       ? JSON.parse(JSON.stringify(LOCATIONS))
       : []
@@ -81,6 +82,7 @@ function hasCapability(cpo, cap) {
 
 function render() {
   document.body.classList.toggle("left-handed", state.handedness === "left");
+  document.body.setAttribute("data-theme", state.theme || "light");
   document.getElementById("form-root").innerHTML = buildGlobal() + buildLocations();
   bindFormEvents();
 }
@@ -93,8 +95,21 @@ function buildGlobal() {
     return '<option value="' + o.value + '"' + (state.handedness === o.value ? " selected" : "") + '>' + o.label + '</option>';
   }).join("");
 
+  var themeOpts = [
+    { value: "auto",  label: "Auto (system)" },
+    { value: "dark",  label: "Dark" },
+    { value: "light", label: "Light" }
+  ].map(function(o) {
+    return '<option value="' + o.value + '"' + ((state.theme || "auto") === o.value ? " selected" : "") + '>' + o.label + '</option>';
+  }).join("");
+
   return '<section class="s-section">' +
     '<h2 class="s-section-title">Display</h2>' +
+    '<div class="s-field">' +
+      '<label class="s-label">Theme</label>' +
+      '<select class="s-input s-select" id="g-theme">' + themeOpts + '</select>' +
+      '<span class="s-hint" id="system-theme-hint">' + systemThemeHint() + '</span>' +
+    '</div>' +
     '<div class="s-field">' +
       '<label class="s-label">Controls side</label>' +
       '<select class="s-input s-select" id="g-handedness">' + handOpts + '</select>' +
@@ -229,9 +244,28 @@ function buildConnector(conn, li, ci) {
   '</div>';
 }
 
+function systemThemeHint() {
+  if (typeof window.matchMedia !== "function") return "System theme: not supported by this browser";
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches)  return "System theme: dark";
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "System theme: light";
+  return "System theme: no preference reported";
+}
+
 // ── Events ────────────────────────────────────────────────────────────────
 
 function bindFormEvents() {
+  document.getElementById("g-theme").addEventListener("change", function() {
+    state.theme = this.value;
+    document.body.setAttribute("data-theme", this.value);
+  });
+
+  if (typeof window.matchMedia === "function") {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function() {
+      var hint = document.getElementById("system-theme-hint");
+      if (hint) hint.textContent = systemThemeHint();
+    });
+  }
+
   document.getElementById("g-handedness").addEventListener("change", function() {
     state.handedness = this.value;
     document.body.classList.toggle("left-handed", this.value === "left");
@@ -326,6 +360,8 @@ function bindFormEvents() {
 // ── Collect form → state ──────────────────────────────────────────────────
 
 function collectIntoState() {
+  var themeEl = document.getElementById("g-theme");
+  if (themeEl) state.theme = themeEl.value;
   var handEl = document.getElementById("g-handedness");
   if (handEl) state.handedness = handEl.value;
 
