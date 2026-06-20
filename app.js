@@ -2,6 +2,7 @@ var REFRESH_INTERVAL = 60;  // seconds
 var refreshTimer = null;
 var countdown = REFRESH_INTERVAL;
 var countdownTimer = null;
+var locationResults = [];
 
 var CONNECTOR_TYPE_LABELS = {
   IEC_62196_T2: "Type 2",
@@ -11,21 +12,27 @@ var CONNECTOR_TYPE_LABELS = {
 };
 
 var STATUS_LABELS = {
-  AVAILABLE: "Available",
-  OCCUPIED: "Occupied",
+  AVAILABLE:              "Available",
+  PREPARING:              "Preparing",
+  OCCUPIED:               "Occupied",
   CONNECTED_NOT_CHARGING: "Connected",
-  OUT_OF_SERVICE: "Out of service",
-  WORKING: "Working",
-  UNKNOWN: "Unknown"
+  FINISHING:              "Finishing",
+  RESERVED:               "Reserved",
+  OUT_OF_SERVICE:         "Out of service",
+  WORKING:                "Working",
+  UNKNOWN:                "Unknown"
 };
 
 var STATUS_CLASSES = {
-  AVAILABLE: "status-available",
-  OCCUPIED: "status-occupied",
+  AVAILABLE:              "status-available",
+  PREPARING:              "status-preparing",
+  OCCUPIED:               "status-occupied",
   CONNECTED_NOT_CHARGING: "status-occupied",
-  OUT_OF_SERVICE: "status-oos",
-  WORKING: "status-unknown",
-  UNKNOWN: "status-unknown"
+  FINISHING:              "status-finishing",
+  RESERVED:               "status-reserved",
+  OUT_OF_SERVICE:         "status-oos",
+  WORKING:                "status-unknown",
+  UNKNOWN:                "status-unknown"
 };
 
 function computeLimits(connector, rules, capabilities) {
@@ -126,7 +133,7 @@ async function fetchLocation(locConfig) {
   };
 }
 
-function renderConnector(connector, context) {
+function renderConnector(connector, context, isOos) {
   var statusClass = STATUS_CLASSES[connector.status] || "status-unknown";
   var statusLabel = STATUS_LABELS[connector.status] || connector.status;
   var typeLabel = CONNECTOR_TYPE_LABELS[connector.type] || connector.type;
@@ -143,7 +150,7 @@ function renderConnector(connector, context) {
   // DOM order inside .connector-status (flex-direction: row-reverse reverses visual order):
   // DOM: [status-badge][not-live?][time][limit-badge]
   // Visual: [limit-badge][time][not-live?][status-badge]
-  return '<div class="connector">' +
+  return '<div class="connector' + (isOos ? ' connector-oos' : '') + '">' +
     '<div class="connector-info">' +
       '<span class="connector-name">' + connector.displayName + '</span>' +
       '<span class="connector-type">' + typeLabel + (connector.kw != null ? ' &middot; ' + connector.kw + ' kW' : '') + '</span>' +
@@ -179,7 +186,7 @@ function renderCardSkeleton(loc) {
   '</div>';
 }
 
-function renderCard(location) {
+function renderCard(location, index) {
   if (location.error) {
     return '<div class="card card-error">' +
       '<div class="card-header"><span class="location-name">' + location.displayName + '</span></div>' +
@@ -187,13 +194,35 @@ function renderCard(location) {
     '</div>';
   }
 
+  var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
+  if (active.length === 0) return '';
+
   var adapter = getAdapter(location.cpoKey) || {};
   var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
-  var connectorsHtml = location.connectors.map(function(c) {
-    return renderConnector(c, context);
-  }).join('');
+  var connectorsHtml = active.map(function(c) { return renderConnector(c, context); }).join('');
+
+  var refreshBtn = index != null
+    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '">↻</button>'
+    : '';
 
   return '<div class="card">' +
+    '<div class="card-header">' +
+      refreshBtn +
+      '<span class="location-name">' + location.displayName + '</span>' +
+      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
+    '</div>' +
+    (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
+    '<div class="connectors">' + connectorsHtml + '</div>' +
+  '</div>';
+}
+
+function renderOosCard(location) {
+  var adapter = getAdapter(location.cpoKey) || {};
+  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
+  var oos = location.connectors.filter(function(c) { return c.status === "OUT_OF_SERVICE"; });
+  var connectorsHtml = oos.map(function(c) { return renderConnector(c, context); }).join('');
+
+  return '<div class="card card-oos">' +
     '<div class="card-header">' +
       '<span class="location-name">' + location.displayName + '</span>' +
       '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
@@ -201,6 +230,22 @@ function renderCard(location) {
     (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
     '<div class="connectors">' + connectorsHtml + '</div>' +
   '</div>';
+}
+
+function renderOosSection() {
+  var el = document.getElementById("oos-section");
+  if (!el) return;
+  var oosLocations = locationResults.filter(function(r) {
+    return r && !r.error && r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; });
+  });
+  if (oosLocations.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML =
+    '<details class="oos-page-section">' +
+      '<summary class="oos-page-summary">Out of service (' + oosLocations.length + ')</summary>' +
+      '<div class="oos-cards">' +
+        oosLocations.map(renderOosCard).join('') +
+      '</div>' +
+    '</details>';
 }
 
 function setLoading(isLoading) {
@@ -222,6 +267,31 @@ function startCountdown() {
     countdown = Math.max(0, countdown - 1);
     updateCountdown();
   }, 1000);
+}
+
+async function refreshSingleLocation(i) {
+  var loc = window.LOCATIONS[i];
+  var slot = document.getElementById("card-slot-" + i);
+  if (!slot) return;
+  slot.style.opacity = "0.5";
+  try {
+    var result = await fetchLocation(loc);
+    locationResults[i] = result;
+    var html = renderCard(result, i);
+    slot.innerHTML = html;
+    slot.style.display = html ? "" : "none";
+    slot.style.opacity = "";
+  } catch (e) {
+    var errResult = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
+    locationResults[i] = errResult;
+    slot.innerHTML = renderCard(errResult, i);
+    slot.style.display = "";
+    slot.style.opacity = "";
+  }
+  renderOosSection();
+  clearTimeout(refreshTimer);
+  startCountdown();
+  refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
 }
 
 async function refresh() {
@@ -265,12 +335,22 @@ async function refresh() {
 
   LOCATIONS.forEach(function(loc, i) {
     fetchLocation(loc).then(function(result) {
+      locationResults[i] = result;
       var slot = document.getElementById("card-slot-" + i);
-      if (slot) { slot.innerHTML = renderCard(result); slot.style.opacity = ""; }
+      if (slot) {
+        var html = renderCard(result, i);
+        slot.innerHTML = html;
+        slot.style.display = html ? "" : "none";
+        slot.style.opacity = "";
+      }
+      renderOosSection();
       oneDone();
     }).catch(function(e) {
+      var errResult = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
+      locationResults[i] = errResult;
       var slot = document.getElementById("card-slot-" + i);
-      if (slot) { slot.innerHTML = renderCard({ displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] }); slot.style.opacity = ""; }
+      if (slot) { slot.innerHTML = renderCard(errResult, i); slot.style.display = ""; slot.style.opacity = ""; }
+      renderOosSection();
       oneDone();
     });
   });
@@ -293,6 +373,12 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("refresh-btn").addEventListener("click", function() {
     clearTimeout(refreshTimer);
     refresh();
+  });
+
+  document.getElementById("cards").addEventListener("click", function(e) {
+    var btn = e.target.closest(".refresh-loc-btn");
+    if (!btn) return;
+    refreshSingleLocation(parseInt(btn.getAttribute("data-loc-index"), 10));
   });
 
   refresh();

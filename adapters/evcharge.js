@@ -27,12 +27,12 @@ ADAPTERS.evcharge = {
   // "Suspended EV" (with space, runtime_status_id=23): car plugged in but BMS paused session.
   RUNTIME_STATUS_MAP: {
     "Available":      "AVAILABLE",
-    "Preparing":      "AVAILABLE",
+    "Preparing":      "PREPARING",
     "Charging":       "OCCUPIED",
     "Suspended EV":   "CONNECTED_NOT_CHARGING",
     "Suspended EVSE": "CONNECTED_NOT_CHARGING",
-    "Finishing":      "WORKING",
-    "Reserved":       "WORKING",
+    "Finishing":      "FINISHING",
+    "Reserved":       "RESERVED",
     "Out of service": "OUT_OF_SERVICE",
     "Faulted":        "OUT_OF_SERVICE",
     "Unavailable":    "OUT_OF_SERVICE",

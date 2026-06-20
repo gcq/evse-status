@@ -35,14 +35,18 @@ header {
   margin-bottom: 20px;
 }
 
-/* Default (right-handed): controls on the left, title on the right */
+/* Default (right-handed): controls left, title right */
 header {
   flex-direction: row-reverse;
 }
 
-/* Left-handed: controls on the right, title on the left */
+/* Left-handed: title left, controls right (inverted order) */
 body.left-handed header {
   flex-direction: row;
+}
+
+body.left-handed .header-controls {
+  flex-direction: row-reverse;
 }
 
 h1 {
@@ -523,7 +527,12 @@ h1 {
   font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
+  flex: 1;
 }
+
+body.left-handed .card-header .refresh-loc-btn { order: 1; }
+body.left-handed .card-header .cpo-badge       { order: -1; }
+body.left-handed .card-header .location-name   { text-align: right; }
 
 .cpo-badge {
   font-size: 13px;
@@ -603,8 +612,11 @@ h1 {
   white-space: nowrap;
 }
 
-.status-available { background: var(--green-bg); color: var(--green); }
-.status-occupied   { background: var(--red-bg);   color: var(--red); }
+.status-available  { background: var(--green-bg);  color: var(--green); }
+.status-preparing  { background: #422006;          color: #fbbf24; }
+.status-occupied   { background: var(--red-bg);    color: var(--red); }
+.status-finishing  { background: #134e4a;          color: #2dd4bf; }
+.status-reserved   { background: #2e1065;          color: #a78bfa; }
 .status-oos        { background: var(--orange-bg); color: var(--orange); }
 .status-unknown    { background: var(--grey-bg);   color: var(--grey); }
 
@@ -628,6 +640,24 @@ h1 {
   background: var(--border);
   animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
+
+.card-oos { opacity: 0.5; }
+
+.oos-page-section { margin-top: 24px; }
+.oos-page-summary {
+  display: block;
+  padding: 12px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  border-top: 1px solid var(--border);
+}
+.oos-page-summary::-webkit-details-marker { display: none; }
+.oos-page-section[open] .oos-page-summary { margin-bottom: 16px; }
+.oos-cards { display: flex; flex-direction: column; gap: 16px; }
 
 .not-live {
   font-size: 12px;
