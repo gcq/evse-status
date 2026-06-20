@@ -201,8 +201,9 @@ function renderCard(location, index) {
   var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
   var connectorsHtml = active.map(function(c) { return renderConnector(c, context); }).join('');
 
+  var refreshIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>';
   var refreshBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '">↻</button>'
+    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '">' + refreshIcon + '</button>'
     : '';
 
   return '<div class="card">' +
