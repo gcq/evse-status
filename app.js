@@ -206,6 +206,8 @@ function renderCard(location, index) {
     '</div>';
   }
 
+  if (index != null && window.LOCATIONS[index] && window.LOCATIONS[index].hidden) return '';
+
   var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
   if (active.length === 0) return '';
 
@@ -224,16 +226,71 @@ function renderCard(location, index) {
     ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="Auto-refresh only this location">' + autoIcon + '</button>'
     : '';
 
+  var eyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var hideBtn = index != null
+    ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="Hide this location">' + eyeIcon + '</button>'
+    : '';
+
   return '<div class="card">' +
     '<div class="card-header">' +
       refreshBtn +
       autoBtn +
+      hideBtn +
       '<span class="location-name">' + location.displayName + '</span>' +
       '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
     '</div>' +
     (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
     '<div class="connectors">' + connectorsHtml + '</div>' +
   '</div>';
+}
+
+function renderHiddenCard(location, index) {
+  var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
+  var adapter = getAdapter(location.cpoKey) || {};
+  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
+  var connectorsHtml = active.map(function(c) { return renderConnector(c, context); }).join('');
+
+  var closedEyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+
+  return '<div class="card">' +
+    '<div class="card-header">' +
+      '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location">' + closedEyeIcon + '</button>' +
+      '<span class="location-name">' + location.displayName + '</span>' +
+      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
+    '</div>' +
+    (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
+    '<div class="connectors">' + connectorsHtml + '</div>' +
+  '</div>';
+}
+
+function renderHiddenSection() {
+  var el = document.getElementById("hidden-section");
+  if (!el) return;
+  var hiddenLocations = [];
+  locationResults.forEach(function(r, i) {
+    if (r && !r.error && LOCATIONS[i] && LOCATIONS[i].hidden) hiddenLocations.push({ result: r, index: i });
+  });
+  if (hiddenLocations.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML =
+    '<details class="oos-page-section">' +
+      '<summary class="oos-page-summary">Hidden (' + hiddenLocations.length + ')</summary>' +
+      '<div class="oos-cards">' +
+        hiddenLocations.map(function(h) { return renderHiddenCard(h.result, h.index); }).join('') +
+      '</div>' +
+    '</details>';
+}
+
+function setLocationHidden(i, value) {
+  LOCATIONS[i].hidden = value;
+  persistLocations();
+  var slot = document.getElementById("card-slot-" + i);
+  if (slot) {
+    var result = locationResults[i];
+    var html = result ? renderCard(result, i) : '';
+    slot.innerHTML = html;
+    slot.style.display = html ? "" : "none";
+  }
+  renderHiddenSection();
 }
 
 function renderOosCard(location) {
@@ -424,6 +481,7 @@ async function updateLocationCard(i) {
     slot.style.opacity = "";
   }
   renderOosSection();
+  renderHiddenSection();
 }
 
 async function refreshSingleLocation(i) {
@@ -441,7 +499,8 @@ async function refresh() {
   if (isFirstLoad) {
     // First load: render skeletons so the page isn't blank
     container.innerHTML = LOCATIONS.map(function(loc, i) {
-      return '<div id="card-slot-' + i + '">' + renderCardSkeleton(loc) + '</div>';
+      var style = loc.hidden ? ' style="display:none"' : '';
+      return '<div id="card-slot-' + i + '"' + style + '>' + renderCardSkeleton(loc) + '</div>';
     }).join("");
   } else {
     // Re-refresh: ensure slots exist and dim existing cards to signal staleness
@@ -479,6 +538,7 @@ async function refresh() {
         slot.style.opacity = "";
       }
       renderOosSection();
+      renderHiddenSection();
       oneDone();
     }).catch(function(e) {
       var errResult = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
@@ -486,6 +546,7 @@ async function refresh() {
       var slot = document.getElementById("card-slot-" + i);
       if (slot) { slot.innerHTML = renderCard(errResult, i); slot.style.display = ""; slot.style.opacity = ""; }
       renderOosSection();
+      renderHiddenSection();
       oneDone();
     });
   });
@@ -523,6 +584,18 @@ document.addEventListener("DOMContentLoaded", function() {
     if (autoBtn) {
       var i = parseInt(autoBtn.getAttribute("data-loc-index"), 10);
       setLocationAutoRefresh(i, !LOCATIONS[i].autoRefresh);
+      return;
+    }
+    var hideBtn = e.target.closest(".hide-loc-btn");
+    if (hideBtn) {
+      setLocationHidden(parseInt(hideBtn.getAttribute("data-loc-index"), 10), true);
+    }
+  });
+
+  document.getElementById("hidden-section").addEventListener("click", function(e) {
+    var unhideBtn = e.target.closest(".unhide-loc-btn");
+    if (unhideBtn) {
+      setLocationHidden(parseInt(unhideBtn.getAttribute("data-loc-index"), 10), false);
     }
   });
 

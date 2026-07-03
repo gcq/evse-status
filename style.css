@@ -581,8 +581,9 @@ h1 {
   flex: 1;
 }
 
-body.left-handed .card-header .refresh-loc-btn      { order: 1; }
-body.left-handed .card-header .auto-refresh-loc-btn { order: 1; }
+body.left-handed .card-header .hide-loc-btn         { order: 1; }
+body.left-handed .card-header .auto-refresh-loc-btn { order: 2; }
+body.left-handed .card-header .refresh-loc-btn      { order: 3; }
 body.left-handed .card-header .cpo-badge            { order: -1; }
 body.left-handed .card-header .location-name        { text-align: right; }
 

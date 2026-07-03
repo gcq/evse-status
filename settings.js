@@ -159,6 +159,11 @@ function buildLocation(loc, li) {
       '</div>' +
     '</div>' +
 
+    '<label class="s-rule-label" style="margin:8px 0;display:block">' +
+      '<input class="s-checkbox loc-hidden-toggle" type="checkbox" data-li="' + li + '"' + (loc.hidden ? " checked" : "") + '> ' +
+      'Hidden from main list' +
+    '</label>' +
+
     '<h4 class="s-subsection-title">Rules</h4>' +
 
     '<div class="s-rule-row' + (maxDur ? " enabled" : "") + '" data-rule="maxChargeDuration">' +
@@ -373,6 +378,7 @@ function collectIntoState() {
     loc.displayName = card.querySelector('[data-fid="loc-' + li + '-displayName"]').value;
     loc.cpo = card.querySelector('[data-fid="loc-' + li + '-cpo"]').value;
     loc.id = card.querySelector('[data-fid="loc-' + li + '-id"]').value;
+    loc.hidden = card.querySelector(".loc-hidden-toggle").checked;
 
     var rules = {};
 
