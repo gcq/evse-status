@@ -218,9 +218,16 @@ function renderCard(location, index) {
     ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '">' + refreshIcon + '</button>'
     : '';
 
+  var autoIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>';
+  var isAutoOnly = index != null && window.LOCATIONS[index] && window.LOCATIONS[index].autoRefresh;
+  var autoBtn = index != null
+    ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="Auto-refresh only this location">' + autoIcon + '</button>'
+    : '';
+
   return '<div class="card">' +
     '<div class="card-header">' +
       refreshBtn +
+      autoBtn +
       '<span class="location-name">' + location.displayName + '</span>' +
       '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
     '</div>' +
@@ -264,32 +271,51 @@ function renderOosSection() {
 function setLoading(isLoading) {
   var btn = document.getElementById("refresh-btn");
   btn.disabled = isLoading;
-  btn.textContent = isLoading ? "Refreshing…" : "Refresh now";
+  if (isLoading) {
+    btn.textContent = "Refreshing…";
+  } else {
+    updateRefreshUI();
+  }
 }
 
-function updateCountdown() {
-  var toggle = document.getElementById("countdown-toggle");
-  if (!toggle) return;
-  if (globalEnabled && refreshDeadlineMs != null) {
-    toggle.classList.remove("is-off");
+// Keeps the mode button (all / selected / off, with matching color) and the
+// separate countdown label in sync with current state.
+function updateRefreshUI() {
+  var btn = document.getElementById("refresh-btn");
+  if (btn && !btn.disabled) {
+    if (globalEnabled) {
+      btn.textContent = "Auto refresh active";
+      btn.className = "mode-all";
+    } else if (LOCATIONS.some(function(loc) { return loc.autoRefresh; })) {
+      btn.textContent = "Selective refresh active";
+      btn.className = "mode-selective";
+    } else {
+      btn.textContent = "Auto refresh disabled";
+      btn.className = "mode-off";
+    }
+  }
+
+  var label = document.getElementById("countdown-label");
+  if (!label) return;
+  if (anyAutoRefreshActive() && refreshDeadlineMs != null) {
     countdown = Math.max(0, Math.ceil((refreshDeadlineMs - Date.now()) / 1000));
     var el = document.getElementById("countdown");
     if (el) {
       el.textContent = countdown;
     } else {
-      toggle.innerHTML = 'Next refresh in <span id="countdown">' + countdown + '</span>s';
+      label.innerHTML = 'Next refresh in <span id="countdown">' + countdown + '</span>s';
     }
+    label.style.display = "";
   } else {
-    toggle.classList.add("is-off");
-    toggle.textContent = "Auto-refresh off — tap to resume";
+    label.style.display = "none";
   }
 }
 
 function startCountdown() {
   refreshDeadlineMs = Date.now() + REFRESH_INTERVAL * 1000;
-  updateCountdown();
+  updateRefreshUI();
   clearInterval(countdownTimer);
-  countdownTimer = setInterval(updateCountdown, 1000);
+  countdownTimer = setInterval(updateRefreshUI, 1000);
 }
 
 function setGlobalEnabled(value) {
@@ -302,18 +328,83 @@ function setGlobalEnabled(value) {
   localStorage.setItem("evse_config", JSON.stringify(cfg));
 }
 
+function persistLocations() {
+  var stored = localStorage.getItem("evse_config");
+  var cfg;
+  try { cfg = stored ? JSON.parse(stored) : {}; } catch (e) { cfg = {}; }
+  cfg.locations = LOCATIONS;
+  localStorage.setItem("evse_config", JSON.stringify(cfg));
+}
+
+// Auto-refresh runs in one of three modes: "all" (globalEnabled), "selected"
+// (globalEnabled off but one or more locations opted in), or fully off.
+function anyAutoRefreshActive() {
+  return globalEnabled || LOCATIONS.some(function(loc) { return loc.autoRefresh; });
+}
+
+function setLocationAutoRefresh(i, value) {
+  LOCATIONS[i].autoRefresh = value;
+  persistLocations();
+  var btn = document.querySelector('.auto-refresh-loc-btn[data-loc-index="' + i + '"]');
+  if (btn) btn.classList.toggle("active", value);
+  if (value) {
+    // Enabling a location's own auto-refresh always takes it out of the
+    // "all locations" cycle — only the selected ones keep refreshing.
+    setGlobalEnabled(false);
+    refreshSingleLocation(i);
+  } else {
+    scheduleNextRefresh();
+  }
+}
+
 // Single place that decides whether/when the next automatic refresh happens.
 function scheduleNextRefresh() {
-  if (!globalEnabled) {
-    updateCountdown();
+  if (!anyAutoRefreshActive()) {
+    updateRefreshUI();
     return;
   }
   startCountdown();
   clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+  refreshTimer = setTimeout(autoRefreshTick, REFRESH_INTERVAL * 1000);
 }
 
-async function refreshSingleLocation(i) {
+function snapCountdownToZero() {
+  clearInterval(countdownTimer);
+  countdown = 0;
+  var countdownEl = document.getElementById("countdown");
+  if (countdownEl) countdownEl.textContent = 0;
+}
+
+// The automatic timer's entry point: refreshes everyone in "all" mode, or
+// just the opted-in locations in "selected" mode.
+async function autoRefreshTick() {
+  if (document.hidden) {
+    // Keep the timer loop alive in the background, but don't do any fetching
+    // until the page is visible again — visibilitychange will catch up then.
+    missedRefreshWhileHidden = true;
+    refreshDeadlineMs = Date.now() + REFRESH_INTERVAL * 1000;
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(autoRefreshTick, REFRESH_INTERVAL * 1000);
+    return;
+  }
+
+  if (globalEnabled) {
+    await refresh();
+    return;
+  }
+
+  var targets = [];
+  LOCATIONS.forEach(function(loc, i) { if (loc.autoRefresh) targets.push(i); });
+  if (targets.length === 0) {
+    scheduleNextRefresh();
+    return;
+  }
+  snapCountdownToZero();
+  await Promise.all(targets.map(updateLocationCard));
+  scheduleNextRefresh();
+}
+
+async function updateLocationCard(i) {
   var loc = window.LOCATIONS[i];
   var slot = document.getElementById("card-slot-" + i);
   if (!slot) return;
@@ -333,25 +424,16 @@ async function refreshSingleLocation(i) {
     slot.style.opacity = "";
   }
   renderOosSection();
+}
+
+async function refreshSingleLocation(i) {
+  await updateLocationCard(i);
   scheduleNextRefresh();
 }
 
 async function refresh() {
-  if (document.hidden) {
-    // Keep the timer loop alive in the background, but don't do any fetching
-    // until the page is visible again — visibilitychange will catch up then.
-    missedRefreshWhileHidden = true;
-    refreshDeadlineMs = Date.now() + REFRESH_INTERVAL * 1000;
-    clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
-    return;
-  }
-
   setLoading(true);
-  clearInterval(countdownTimer);
-  countdown = 0;
-  var countdownEl = document.getElementById("countdown");
-  if (countdownEl) countdownEl.textContent = 0;
+  snapCountdownToZero();
 
   var container = document.getElementById("cards");
   var isFirstLoad = !document.getElementById("card-slot-0");
@@ -417,6 +499,9 @@ document.addEventListener("DOMContentLoaded", function() {
       if (cfg.handedness) HANDEDNESS = cfg.handedness;
       if (cfg.locations)  LOCATIONS  = cfg.locations;
       globalEnabled = (cfg && cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
+      // Defensive: "all locations" mode and per-location auto-refresh are
+      // mutually exclusive — don't trust stale/hand-edited config to agree.
+      if (globalEnabled) LOCATIONS.forEach(function(loc) { loc.autoRefresh = false; });
     } catch (e) {}
   }
 
@@ -426,39 +511,46 @@ document.addEventListener("DOMContentLoaded", function() {
 
   document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "light");
 
-  updateCountdown();
-
-  document.getElementById("refresh-btn").addEventListener("click", function() {
-    clearTimeout(refreshTimer);
-    refresh();
-  });
+  updateRefreshUI();
 
   document.getElementById("cards").addEventListener("click", function(e) {
-    var btn = e.target.closest(".refresh-loc-btn");
-    if (!btn) return;
-    refreshSingleLocation(parseInt(btn.getAttribute("data-loc-index"), 10));
+    var refreshBtn = e.target.closest(".refresh-loc-btn");
+    if (refreshBtn) {
+      refreshSingleLocation(parseInt(refreshBtn.getAttribute("data-loc-index"), 10));
+      return;
+    }
+    var autoBtn = e.target.closest(".auto-refresh-loc-btn");
+    if (autoBtn) {
+      var i = parseInt(autoBtn.getAttribute("data-loc-index"), 10);
+      setLocationAutoRefresh(i, !LOCATIONS[i].autoRefresh);
+    }
   });
 
-  document.getElementById("countdown-toggle").addEventListener("click", function() {
+  document.getElementById("refresh-btn").addEventListener("click", function() {
     var enabling = !globalEnabled;
     setGlobalEnabled(enabling);
     if (enabling) {
+      LOCATIONS.forEach(function(loc) { loc.autoRefresh = false; });
+      persistLocations();
+      document.querySelectorAll(".auto-refresh-loc-btn.active").forEach(function(btn) {
+        btn.classList.remove("active");
+      });
       scheduleNextRefresh();
     } else {
       refreshDeadlineMs = null;
       clearTimeout(refreshTimer);
       clearInterval(countdownTimer);
-      updateCountdown();
+      updateRefreshUI();
     }
   });
 
   document.addEventListener("visibilitychange", function() {
     if (document.hidden) return;
-    updateCountdown();
+    updateRefreshUI();
     if (missedRefreshWhileHidden) {
       missedRefreshWhileHidden = false;
       clearTimeout(refreshTimer);
-      refresh();
+      autoRefreshTick();
     }
   });
 

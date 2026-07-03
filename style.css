@@ -112,28 +112,11 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.countdown-toggle {
+.countdown-label {
   display: inline-block;
   font-size: 14px;
   color: var(--text-secondary);
   white-space: nowrap;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 12px;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.countdown-toggle:active {
-  background: var(--surface);
-  transition-duration: 0.1s;
-}
-
-.countdown-toggle.is-off {
-  color: var(--text-secondary);
-  border-color: var(--border);
-  opacity: 0.75;
 }
 
 /* Fixed width so changing digits don't shift the layout */
@@ -169,11 +152,16 @@ h1 {
 .btn-danger    { background: var(--red-bg); color: var(--red); border-color: var(--red-bg); }
 .btn-icon      { padding: 0; min-width: 44px; font-size: 20px; }
 
+.auto-refresh-loc-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .btn:disabled  { opacity: 0.5; cursor: not-allowed; }
 
 /* keep backward compat with the old #refresh-btn selectors */
 #refresh-btn {
-  background: var(--accent);
+  background: var(--grey);
   color: #fff;
   border: 3px solid transparent;
   border-radius: 4px;
@@ -185,6 +173,11 @@ h1 {
   min-width: 140px;
   transition: background-color 0.33s, border-color 0.33s, color 0.33s;
 }
+
+/* Mode indicator: all locations refreshing / just the selected ones / off */
+#refresh-btn.mode-all       { background: var(--green); }
+#refresh-btn.mode-selective { background: var(--accent); }
+#refresh-btn.mode-off       { background: var(--grey); }
 
 #refresh-btn:disabled {
   background: var(--border);
@@ -588,9 +581,10 @@ h1 {
   flex: 1;
 }
 
-body.left-handed .card-header .refresh-loc-btn { order: 1; }
-body.left-handed .card-header .cpo-badge       { order: -1; }
-body.left-handed .card-header .location-name   { text-align: right; }
+body.left-handed .card-header .refresh-loc-btn      { order: 1; }
+body.left-handed .card-header .auto-refresh-loc-btn { order: 1; }
+body.left-handed .card-header .cpo-badge            { order: -1; }
+body.left-handed .card-header .location-name        { text-align: right; }
 
 .cpo-badge {
   font-size: 12px;

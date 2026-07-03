@@ -10,10 +10,10 @@
   <header>
     <h1>EVSE Status</h1>
     <div class="header-controls">
-      <button id="refresh-btn">Refresh now</button>
+      <button id="refresh-btn" type="button">Auto refresh active</button>
       <a href="settings.html" class="btn btn-secondary">Settings</a>
       <span id="last-updated">Updated <span id="last-updated-time">--:--</span></span>
-      <button class="countdown-toggle" id="countdown-toggle" type="button">Next refresh in <span id="countdown">60</span>s</button>
+      <span class="countdown-label" id="countdown-label">Next refresh in <span id="countdown">60</span>s</span>
     </div>
   </header>
   <main id="cards"></main>
