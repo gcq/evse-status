@@ -216,10 +216,13 @@ function toggleStation(stationId, cpoKey) {
       cb.addEventListener("change", function() {
         var connId = this.dataset.connId;
         if (this.checked) {
+          var station = stations.find(function(s) { return s.id === stationId && s.cpoKey === cpoKey; });
           pendingPins.push({
             stationId: stationId,
             cpoKey: cpoKey,
             stationName: location.name || stationId,
+            lat: station ? station.lat : null,
+            lon: station ? station.lon : null,
             connectorId: connId,
             displayName: this.dataset.displayName
           });
@@ -316,6 +319,8 @@ function pinSelected() {
         id: group.pin.stationId,
         cpo: group.pin.cpoKey,
         displayName: group.pin.stationName,
+        lat: group.pin.lat != null ? group.pin.lat : null,
+        lon: group.pin.lon != null ? group.pin.lon : null,
         rules: null,
         connectors: group.connectors
       });

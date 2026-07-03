@@ -22,6 +22,8 @@ function defaultConfig() {
   return {
     handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
     theme: "light",
+    locationOrder: "config",
+    maxDistanceKm: null,
     locations: (typeof LOCATIONS !== "undefined")
       ? JSON.parse(JSON.stringify(LOCATIONS))
       : []
@@ -29,7 +31,7 @@ function defaultConfig() {
 }
 
 function emptyLocation() {
-  return { id: "", cpo: "electromaps", displayName: "", rules: null, connectors: [] };
+  return { id: "", cpo: "electromaps", displayName: "", lat: null, lon: null, rules: null, connectors: [] };
 }
 
 function emptyConnector() {
@@ -103,6 +105,19 @@ function buildGlobal() {
     return '<option value="' + o.value + '"' + ((state.theme || "auto") === o.value ? " selected" : "") + '>' + o.label + '</option>';
   }).join("");
 
+  var orderOpts = [
+    { value: "config",   label: "Manual order (as listed below)" },
+    { value: "distance", label: "By distance (closest first)" }
+  ].map(function(o) {
+    return '<option value="' + o.value + '"' + ((state.locationOrder || "config") === o.value ? " selected" : "") + '>' + o.label + '</option>';
+  }).join("");
+
+  var distanceRelatedFields = (state.locationOrder === "distance")
+    ? field("g-max-distance", "Max distance (km)",
+        input("g-max-distance", state.maxDistanceKm != null ? state.maxDistanceKm : "", { type: "number", step: "any", min: 0, placeholder: "e.g. 30" }),
+        "Leave blank for no cutoff — locations further than this move to a collapsed \"Out of range\" section")
+    : "";
+
   return '<section class="s-section">' +
     '<h2 class="s-section-title">Display</h2>' +
     '<div class="s-field">' +
@@ -114,6 +129,12 @@ function buildGlobal() {
       '<label class="s-label">Controls side</label>' +
       '<select class="s-input s-select" id="g-handedness">' + handOpts + '</select>' +
     '</div>' +
+    '<div class="s-field">' +
+      '<label class="s-label">Location order</label>' +
+      '<select class="s-input s-select" id="g-location-order">' + orderOpts + '</select>' +
+      '<span class="s-hint">Distance mode uses your live location (high-accuracy GPS) to sort and can affect battery use</span>' +
+    '</div>' +
+    distanceRelatedFields +
   '</section>';
 }
 
@@ -156,6 +177,17 @@ function buildLocation(loc, li) {
       '<div class="s-field">' +
         field("loc-" + li + "-id", "Location ID",
           input("loc-" + li + "-id", loc.id, { placeholder: "e.g. 42479" })) +
+      '</div>' +
+    '</div>' +
+
+    '<div class="s-field-row">' +
+      '<div class="s-field">' +
+        field("loc-" + li + "-lat", "Latitude",
+          input("loc-" + li + "-lat", loc.lat != null ? loc.lat : "", { type: "number", step: "any", placeholder: "e.g. 41.4036" })) +
+      '</div>' +
+      '<div class="s-field">' +
+        field("loc-" + li + "-lon", "Longitude",
+          input("loc-" + li + "-lon", loc.lon != null ? loc.lon : "", { type: "number", step: "any", placeholder: "e.g. 2.1744" })) +
       '</div>' +
     '</div>' +
 
@@ -276,6 +308,12 @@ function bindFormEvents() {
     document.body.classList.toggle("left-handed", this.value === "left");
   });
 
+  document.getElementById("g-location-order").addEventListener("change", function() {
+    collectIntoState();
+    state.locationOrder = this.value;
+    render();
+  });
+
   document.getElementById("add-loc-btn").addEventListener("click", function() {
     collectIntoState();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -369,6 +407,13 @@ function collectIntoState() {
   if (themeEl) state.theme = themeEl.value;
   var handEl = document.getElementById("g-handedness");
   if (handEl) state.handedness = handEl.value;
+  var orderEl = document.getElementById("g-location-order");
+  if (orderEl) state.locationOrder = orderEl.value;
+  var maxDistEl = document.querySelector('[data-fid="g-max-distance"]');
+  if (maxDistEl) {
+    var maxDist = parseFloat(maxDistEl.value);
+    state.maxDistanceKm = maxDistEl.value.trim() && !isNaN(maxDist) ? maxDist : null;
+  }
 
   document.querySelectorAll(".loc-card").forEach(function(card) {
     var li = +card.dataset.li;
@@ -378,6 +423,10 @@ function collectIntoState() {
     loc.displayName = card.querySelector('[data-fid="loc-' + li + '-displayName"]').value;
     loc.cpo = card.querySelector('[data-fid="loc-' + li + '-cpo"]').value;
     loc.id = card.querySelector('[data-fid="loc-' + li + '-id"]').value;
+    var latVal = card.querySelector('[data-fid="loc-' + li + '-lat"]').value;
+    var lonVal = card.querySelector('[data-fid="loc-' + li + '-lon"]').value;
+    loc.lat = latVal.trim() !== "" && !isNaN(parseFloat(latVal)) ? parseFloat(latVal) : null;
+    loc.lon = lonVal.trim() !== "" && !isNaN(parseFloat(lonVal)) ? parseFloat(lonVal) : null;
     loc.hidden = card.querySelector(".loc-hidden-toggle").checked;
 
     var rules = {};

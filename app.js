@@ -10,6 +10,11 @@ var missedRefreshWhileHidden = false;
 var refreshDeadlineMs = null;
 var locationResults = [];
 
+var locationOrder = "config"; // "config" (default) or "distance" — opt-in via Settings
+var maxDistanceKm = null;
+var currentPosition = null;   // { lat, lon } once geolocation resolves, else null
+var locationDistances = [];   // meters, parallel to LOCATIONS; null = unknown
+
 var CONNECTOR_TYPE_LABELS = {
   IEC_62196_T2: "Type 2",
   IEC_62196_T2_COMBO: "CCS",
@@ -124,6 +129,17 @@ async function fetchLocation(locConfig) {
     locConfig.connectors.map(function(c) { return c.id; })
   );
 
+  // TODO(remove): migration shim only, for locations pinned before lat/lon
+  // was captured at pin time (discover.js's pinSelected() now sets it
+  // directly). Safe to delete once existing users' configs have all been
+  // backfilled once — new locations never need this.
+  if ((locConfig.lat == null || locConfig.lon == null) && data.lat != null && data.lon != null) {
+    locConfig.lat = data.lat;
+    locConfig.lon = data.lon;
+    persistLocations();
+    if (currentPosition) computeDistances();
+  }
+
   var displayNameMap = {};
   locConfig.connectors.forEach(function(c) { displayNameMap[c.id] = c.displayName; });
 
@@ -207,6 +223,7 @@ function renderCard(location, index) {
   }
 
   if (index != null && window.LOCATIONS[index] && window.LOCATIONS[index].hidden) return '';
+  if (index != null && isOutOfRange(index)) return '';
 
   var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
   if (active.length === 0) return '';
@@ -239,9 +256,17 @@ function renderCard(location, index) {
       '<span class="location-name">' + location.displayName + '</span>' +
       '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
     '</div>' +
-    (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
+    renderAddressLine(location, index) +
     '<div class="connectors">' + connectorsHtml + '</div>' +
   '</div>';
+}
+
+function renderAddressLine(location, index) {
+  var distM = index != null ? locationDistances[index] : null;
+  var parts = [];
+  if (location.address) parts.push(location.address);
+  if (distM != null) parts.push(formatDistance(distM) + " away");
+  return parts.length ? '<div class="location-address">' + parts.join(" · ") + '</div>' : '';
 }
 
 function renderHiddenCard(location, index) {
@@ -258,7 +283,7 @@ function renderHiddenCard(location, index) {
       '<span class="location-name">' + location.displayName + '</span>' +
       '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
     '</div>' +
-    (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
+    renderAddressLine(location, index) +
     '<div class="connectors">' + connectorsHtml + '</div>' +
   '</div>';
 }
@@ -280,17 +305,93 @@ function renderHiddenSection() {
     '</details>';
 }
 
+function rerenderCardSlot(i) {
+  var slot = document.getElementById("card-slot-" + i);
+  if (!slot) return;
+  var result = locationResults[i];
+  var html = result ? renderCard(result, i) : '';
+  slot.innerHTML = html;
+  slot.style.display = html ? "" : "none";
+}
+
 function setLocationHidden(i, value) {
   LOCATIONS[i].hidden = value;
   persistLocations();
-  var slot = document.getElementById("card-slot-" + i);
-  if (slot) {
-    var result = locationResults[i];
-    var html = result ? renderCard(result, i) : '';
-    slot.innerHTML = html;
-    slot.style.display = html ? "" : "none";
-  }
+  rerenderCardSlot(i);
   renderHiddenSection();
+  renderOutOfRangeSection();
+}
+
+function formatDistance(m) {
+  return m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(1) + " km";
+}
+
+function isOutOfRange(i) {
+  return locationDistances[i] != null && !!maxDistanceKm && locationDistances[i] > maxDistanceKm * 1000;
+}
+
+function computeDistances() {
+  LOCATIONS.forEach(function(loc, i) {
+    locationDistances[i] = (currentPosition && loc.lat != null && loc.lon != null)
+      ? haversineM(currentPosition.lat, currentPosition.lon, loc.lat, loc.lon)
+      : null;
+  });
+}
+
+function reorderCardsByDistance() {
+  var container = document.getElementById("cards");
+  if (!container) return;
+  var indices = LOCATIONS.map(function(_, i) { return i; });
+  indices.sort(function(a, b) {
+    var da = locationDistances[a], db = locationDistances[b];
+    if (da == null && db == null) return 0;
+    if (da == null) return 1;
+    if (db == null) return -1;
+    return da - db;
+  });
+  indices.forEach(function(i) {
+    var slot = document.getElementById("card-slot-" + i);
+    if (slot) container.appendChild(slot);
+  });
+}
+
+function renderOutOfRangeCard(location, index) {
+  var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
+  var adapter = getAdapter(location.cpoKey) || {};
+  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
+  var connectorsHtml = active.map(function(c) { return renderConnector(c, context); }).join('');
+
+  return '<div class="card">' +
+    '<div class="card-header">' +
+      '<span class="location-name">' + location.displayName + '</span>' +
+      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
+    '</div>' +
+    renderAddressLine(location, index) +
+    '<div class="connectors">' + connectorsHtml + '</div>' +
+  '</div>';
+}
+
+function renderOutOfRangeSection() {
+  var el = document.getElementById("out-of-range-section");
+  if (!el) return;
+  var items = [];
+  locationResults.forEach(function(r, i) {
+    if (r && !r.error && LOCATIONS[i] && !LOCATIONS[i].hidden && isOutOfRange(i)) items.push({ result: r, index: i });
+  });
+  if (items.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML =
+    '<details class="oos-page-section">' +
+      '<summary class="oos-page-summary">Out of range (' + items.length + ')</summary>' +
+      '<div class="oos-cards">' +
+        items.map(function(it) { return renderOutOfRangeCard(it.result, it.index); }).join('') +
+      '</div>' +
+    '</details>';
+}
+
+function applyDistanceLayout() {
+  LOCATIONS.forEach(function(loc, i) { if (locationResults[i]) rerenderCardSlot(i); });
+  reorderCardsByDistance();
+  renderOutOfRangeSection();
 }
 
 function renderOosCard(location) {
@@ -482,6 +583,7 @@ async function updateLocationCard(i) {
   }
   renderOosSection();
   renderHiddenSection();
+  renderOutOfRangeSection();
 }
 
 async function refreshSingleLocation(i) {
@@ -539,6 +641,7 @@ async function refresh() {
       }
       renderOosSection();
       renderHiddenSection();
+      renderOutOfRangeSection();
       oneDone();
     }).catch(function(e) {
       var errResult = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
@@ -547,6 +650,7 @@ async function refresh() {
       if (slot) { slot.innerHTML = renderCard(errResult, i); slot.style.display = ""; slot.style.opacity = ""; }
       renderOosSection();
       renderHiddenSection();
+      renderOutOfRangeSection();
       oneDone();
     });
   });
@@ -559,6 +663,8 @@ document.addEventListener("DOMContentLoaded", function() {
       var cfg = JSON.parse(stored);
       if (cfg.handedness) HANDEDNESS = cfg.handedness;
       if (cfg.locations)  LOCATIONS  = cfg.locations;
+      if (cfg.maxDistanceKm) maxDistanceKm = cfg.maxDistanceKm;
+      if (cfg.locationOrder === "distance") locationOrder = "distance";
       globalEnabled = (cfg && cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
       // Defensive: "all locations" mode and per-location auto-refresh are
       // mutually exclusive — don't trust stale/hand-edited config to agree.
@@ -626,6 +732,23 @@ document.addEventListener("DOMContentLoaded", function() {
       autoRefreshTick();
     }
   });
+
+  if (locationOrder === "distance" && navigator.geolocation) {
+    // Distance ordering is opt-in (Settings > Location order) since it needs
+    // high-accuracy GPS to be useful while driving, which costs battery.
+    // watchPosition subscribes to ongoing updates (as the device moves),
+    // instead of a one-shot getCurrentPosition check on load — so distances
+    // and the out-of-range section stay live while the page stays open.
+    navigator.geolocation.watchPosition(
+      function(position) {
+        currentPosition = { lat: position.coords.latitude, lon: position.coords.longitude };
+        computeDistances();
+        applyDistanceLayout();
+      },
+      function() { /* denied/unavailable — fall back to config order, no error shown */ },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
+    );
+  }
 
   refresh();
 });
