@@ -273,8 +273,47 @@ h1 {
   border-color: var(--accent);
 }
 
+.s-input:read-only,
+.s-input:disabled {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
 .s-input.field-error {
   border-color: var(--red);
+}
+
+.s-segmented {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.s-segment {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+  min-height: 36px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.s-segment.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.s-segment:active {
+  transform: scale(0.97);
 }
 
 .s-select {

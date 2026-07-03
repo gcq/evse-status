@@ -64,6 +64,7 @@ function input(id, value, opts) {
     (opts.min !== undefined ? ' min="' + opts.min + '"' : '') +
     (opts.max !== undefined ? ' max="' + opts.max + '"' : '') +
     (opts.step ? ' step="' + opts.step + '"' : '') +
+    (opts.readonly ? ' readonly' : '') +
     '>';
 }
 
@@ -89,29 +90,14 @@ function render() {
   bindFormEvents();
 }
 
+function segmentedControl(id, options, selected) {
+  var segments = options.map(function(o) {
+    return '<button type="button" class="s-segment' + (o.value === selected ? " active" : "") + '" data-value="' + o.value + '">' + o.label + '</button>';
+  }).join("");
+  return '<div class="s-segmented" id="' + id + '" data-value="' + selected + '">' + segments + '</div>';
+}
+
 function buildGlobal() {
-  var handOpts = [
-    { value: "right", label: "Right-handed (controls on left)" },
-    { value: "left",  label: "Left-handed (controls on right)" }
-  ].map(function(o) {
-    return '<option value="' + o.value + '"' + (state.handedness === o.value ? " selected" : "") + '>' + o.label + '</option>';
-  }).join("");
-
-  var themeOpts = [
-    { value: "auto",  label: "Auto (system)" },
-    { value: "dark",  label: "Dark" },
-    { value: "light", label: "Light" }
-  ].map(function(o) {
-    return '<option value="' + o.value + '"' + ((state.theme || "auto") === o.value ? " selected" : "") + '>' + o.label + '</option>';
-  }).join("");
-
-  var orderOpts = [
-    { value: "config",   label: "Manual order (as listed below)" },
-    { value: "distance", label: "By distance (closest first)" }
-  ].map(function(o) {
-    return '<option value="' + o.value + '"' + ((state.locationOrder || "config") === o.value ? " selected" : "") + '>' + o.label + '</option>';
-  }).join("");
-
   var distanceRelatedFields = (state.locationOrder === "distance")
     ? field("g-max-distance", "Max distance (km)",
         input("g-max-distance", state.maxDistanceKm != null ? state.maxDistanceKm : "", { type: "number", step: "any", min: 0, placeholder: "e.g. 30" }),
@@ -122,16 +108,27 @@ function buildGlobal() {
     '<h2 class="s-section-title">Display</h2>' +
     '<div class="s-field">' +
       '<label class="s-label">Theme</label>' +
-      '<select class="s-input s-select" id="g-theme">' + themeOpts + '</select>' +
+      segmentedControl("g-theme", [
+        { value: "auto",  label: "Auto" },
+        { value: "dark",  label: "Dark" },
+        { value: "light", label: "Light" }
+      ], state.theme || "auto") +
       '<span class="s-hint" id="system-theme-hint">' + systemThemeHint() + '</span>' +
     '</div>' +
     '<div class="s-field">' +
-      '<label class="s-label">Controls side</label>' +
-      '<select class="s-input s-select" id="g-handedness">' + handOpts + '</select>' +
+      '<label class="s-label">Driving side</label>' +
+      segmentedControl("g-handedness", [
+        { value: "right", label: "Right" },
+        { value: "left",  label: "Left" }
+      ], state.handedness || "right") +
+      '<span class="s-hint">Controls move to the opposite side, near your hand</span>' +
     '</div>' +
     '<div class="s-field">' +
       '<label class="s-label">Location order</label>' +
-      '<select class="s-input s-select" id="g-location-order">' + orderOpts + '</select>' +
+      segmentedControl("g-location-order", [
+        { value: "config",   label: "Manual" },
+        { value: "distance", label: "Distance" }
+      ], state.locationOrder || "config") +
       '<span class="s-hint">Distance mode uses your live location (high-accuracy GPS) to sort and can affect battery use</span>' +
     '</div>' +
     distanceRelatedFields +
@@ -169,14 +166,14 @@ function buildLocation(loc, li) {
     '<div class="s-field-row">' +
       '<div class="s-field">' +
         '<label class="s-label">CPO</label>' +
-        '<select class="s-input s-select loc-cpo-select" data-li="' + li + '" data-fid="loc-' + li + '-cpo">' +
+        '<select class="s-input s-select loc-cpo-select" data-li="' + li + '" data-fid="loc-' + li + '-cpo" disabled>' +
           getCpoOptions(loc.cpo) +
         '</select>' +
         '<span class="s-error" data-err="loc-' + li + '-cpo"></span>' +
       '</div>' +
       '<div class="s-field">' +
         field("loc-" + li + "-id", "Location ID",
-          input("loc-" + li + "-id", loc.id, { placeholder: "e.g. 42479" })) +
+          input("loc-" + li + "-id", loc.id, { placeholder: "e.g. 42479", readonly: true })) +
       '</div>' +
     '</div>' +
 
@@ -269,7 +266,7 @@ function buildConnector(conn, li, ci) {
   return '<div class="s-conn-row conn-row" data-li="' + li + '" data-ci="' + ci + '">' +
     '<div class="s-field">' +
       '<label class="s-label">Connector ID</label>' +
-      input("loc-" + li + "-conn-" + ci + "-id", conn.id, { placeholder: "e.g. 114172" }) +
+      input("loc-" + li + "-conn-" + ci + "-id", conn.id, { placeholder: "e.g. 114172", readonly: true }) +
       '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-id"></span>' +
     '</div>' +
     '<div class="s-field">' +
@@ -291,9 +288,26 @@ function systemThemeHint() {
 // ── Events ────────────────────────────────────────────────────────────────
 
 function bindFormEvents() {
-  document.getElementById("g-theme").addEventListener("change", function() {
-    state.theme = this.value;
-    document.body.setAttribute("data-theme", this.value);
+  document.querySelectorAll(".s-segmented").forEach(function(group) {
+    group.querySelectorAll(".s-segment").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        group.querySelectorAll(".s-segment").forEach(function(b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        group.dataset.value = btn.dataset.value;
+
+        if (group.id === "g-theme") {
+          state.theme = btn.dataset.value;
+          document.body.setAttribute("data-theme", btn.dataset.value);
+        } else if (group.id === "g-handedness") {
+          state.handedness = btn.dataset.value;
+          document.body.classList.toggle("left-handed", btn.dataset.value === "left");
+        } else if (group.id === "g-location-order") {
+          collectIntoState();
+          state.locationOrder = btn.dataset.value;
+          render();
+        }
+      });
+    });
   });
 
   if (typeof window.matchMedia === "function") {
@@ -302,17 +316,6 @@ function bindFormEvents() {
       if (hint) hint.textContent = systemThemeHint();
     });
   }
-
-  document.getElementById("g-handedness").addEventListener("change", function() {
-    state.handedness = this.value;
-    document.body.classList.toggle("left-handed", this.value === "left");
-  });
-
-  document.getElementById("g-location-order").addEventListener("change", function() {
-    collectIntoState();
-    state.locationOrder = this.value;
-    render();
-  });
 
   document.getElementById("add-loc-btn").addEventListener("click", function() {
     collectIntoState();
@@ -404,11 +407,11 @@ function bindFormEvents() {
 
 function collectIntoState() {
   var themeEl = document.getElementById("g-theme");
-  if (themeEl) state.theme = themeEl.value;
+  if (themeEl) state.theme = themeEl.dataset.value;
   var handEl = document.getElementById("g-handedness");
-  if (handEl) state.handedness = handEl.value;
+  if (handEl) state.handedness = handEl.dataset.value;
   var orderEl = document.getElementById("g-location-order");
-  if (orderEl) state.locationOrder = orderEl.value;
+  if (orderEl) state.locationOrder = orderEl.dataset.value;
   var maxDistEl = document.querySelector('[data-fid="g-max-distance"]');
   if (maxDistEl) {
     var maxDist = parseFloat(maxDistEl.value);

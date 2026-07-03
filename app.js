@@ -9,6 +9,7 @@ var missedRefreshWhileHidden = false;
 // stays accurate even when the interval's ticks get throttled while hidden.
 var refreshDeadlineMs = null;
 var locationResults = [];
+var locationLastUpdated = []; // ISO timestamp per location, set on each successful fetch
 
 var locationOrder = "config"; // "config" (default) or "distance" — opt-in via Settings
 var maxDistanceKm = null;
@@ -263,9 +264,11 @@ function renderCard(location, index) {
 
 function renderAddressLine(location, index) {
   var distM = index != null ? locationDistances[index] : null;
+  var lastUpdated = index != null ? locationLastUpdated[index] : null;
   var parts = [];
   if (location.address) parts.push(location.address);
   if (distM != null) parts.push(formatDistance(distM) + " away");
+  if (lastUpdated) parts.push("Updated " + formatRelativeTime(lastUpdated));
   return parts.length ? '<div class="location-address">' + parts.join(" · ") + '</div>' : '';
 }
 
@@ -394,7 +397,7 @@ function applyDistanceLayout() {
   renderOutOfRangeSection();
 }
 
-function renderOosCard(location) {
+function renderOosCard(location, index) {
   var adapter = getAdapter(location.cpoKey) || {};
   var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
   var oos = location.connectors.filter(function(c) { return c.status === "OUT_OF_SERVICE"; });
@@ -405,7 +408,7 @@ function renderOosCard(location) {
       '<span class="location-name">' + location.displayName + '</span>' +
       '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
     '</div>' +
-    (location.address ? '<div class="location-address">' + location.address + '</div>' : '') +
+    renderAddressLine(location, index) +
     '<div class="connectors">' + connectorsHtml + '</div>' +
   '</div>';
 }
@@ -413,15 +416,18 @@ function renderOosCard(location) {
 function renderOosSection() {
   var el = document.getElementById("oos-section");
   if (!el) return;
-  var oosLocations = locationResults.filter(function(r) {
-    return r && !r.error && r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; });
+  var oosLocations = [];
+  locationResults.forEach(function(r, i) {
+    if (r && !r.error && r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; })) {
+      oosLocations.push({ result: r, index: i });
+    }
   });
   if (oosLocations.length === 0) { el.innerHTML = ''; return; }
   el.innerHTML =
     '<details class="oos-page-section">' +
       '<summary class="oos-page-summary">Out of service (' + oosLocations.length + ')</summary>' +
       '<div class="oos-cards">' +
-        oosLocations.map(renderOosCard).join('') +
+        oosLocations.map(function(o) { return renderOosCard(o.result, o.index); }).join('') +
       '</div>' +
     '</details>';
 }
@@ -570,6 +576,7 @@ async function updateLocationCard(i) {
   try {
     var result = await fetchLocation(loc);
     locationResults[i] = result;
+    locationLastUpdated[i] = new Date().toISOString();
     var html = renderCard(result, i);
     slot.innerHTML = html;
     slot.style.display = html ? "" : "none";
@@ -623,7 +630,6 @@ async function refresh() {
   function oneDone() {
     pending--;
     if (pending === 0) {
-      document.getElementById("last-updated-time").textContent = new Date().toLocaleTimeString();
       setLoading(false);
       scheduleNextRefresh();
     }
@@ -632,6 +638,7 @@ async function refresh() {
   LOCATIONS.forEach(function(loc, i) {
     fetchLocation(loc).then(function(result) {
       locationResults[i] = result;
+      locationLastUpdated[i] = new Date().toISOString();
       var slot = document.getElementById("card-slot-" + i);
       if (slot) {
         var html = renderCard(result, i);
