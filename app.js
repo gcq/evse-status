@@ -3,6 +3,11 @@ var refreshTimer = null;
 var countdown = REFRESH_INTERVAL;
 var countdownTimer = null;
 var globalEnabled = true;
+var missedRefreshWhileHidden = false;
+// Wall-clock deadline for the next auto-refresh. The displayed countdown is
+// derived from this on every tick instead of being decremented by hand, so it
+// stays accurate even when the interval's ticks get throttled while hidden.
+var refreshDeadlineMs = null;
 var locationResults = [];
 
 var CONNECTOR_TYPE_LABELS = {
@@ -265,8 +270,9 @@ function setLoading(isLoading) {
 function updateCountdown() {
   var toggle = document.getElementById("countdown-toggle");
   if (!toggle) return;
-  if (globalEnabled) {
+  if (globalEnabled && refreshDeadlineMs != null) {
     toggle.classList.remove("is-off");
+    countdown = Math.max(0, Math.ceil((refreshDeadlineMs - Date.now()) / 1000));
     var el = document.getElementById("countdown");
     if (el) {
       el.textContent = countdown;
@@ -280,13 +286,10 @@ function updateCountdown() {
 }
 
 function startCountdown() {
-  countdown = REFRESH_INTERVAL;
+  refreshDeadlineMs = Date.now() + REFRESH_INTERVAL * 1000;
   updateCountdown();
   clearInterval(countdownTimer);
-  countdownTimer = setInterval(function() {
-    countdown = Math.max(0, countdown - 1);
-    updateCountdown();
-  }, 1000);
+  countdownTimer = setInterval(updateCountdown, 1000);
 }
 
 function setGlobalEnabled(value) {
@@ -297,6 +300,17 @@ function setGlobalEnabled(value) {
   if (!cfg.refresh) cfg.refresh = {};
   cfg.refresh.globalEnabled = value;
   localStorage.setItem("evse_config", JSON.stringify(cfg));
+}
+
+// Single place that decides whether/when the next automatic refresh happens.
+function scheduleNextRefresh() {
+  if (!globalEnabled) {
+    updateCountdown();
+    return;
+  }
+  startCountdown();
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
 }
 
 async function refreshSingleLocation(i) {
@@ -319,18 +333,25 @@ async function refreshSingleLocation(i) {
     slot.style.opacity = "";
   }
   renderOosSection();
-  if (globalEnabled) {
-    clearTimeout(refreshTimer);
-    startCountdown();
-    refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
-  } else {
-    updateCountdown();
-  }
+  scheduleNextRefresh();
 }
 
 async function refresh() {
+  if (document.hidden) {
+    // Keep the timer loop alive in the background, but don't do any fetching
+    // until the page is visible again — visibilitychange will catch up then.
+    missedRefreshWhileHidden = true;
+    refreshDeadlineMs = Date.now() + REFRESH_INTERVAL * 1000;
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+    return;
+  }
+
   setLoading(true);
   clearInterval(countdownTimer);
+  countdown = 0;
+  var countdownEl = document.getElementById("countdown");
+  if (countdownEl) countdownEl.textContent = 0;
 
   var container = document.getElementById("cards");
   var isFirstLoad = !document.getElementById("card-slot-0");
@@ -361,13 +382,7 @@ async function refresh() {
     if (pending === 0) {
       document.getElementById("last-updated-time").textContent = new Date().toLocaleTimeString();
       setLoading(false);
-      if (globalEnabled) {
-        startCountdown();
-        clearTimeout(refreshTimer);
-        refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
-      } else {
-        updateCountdown();
-      }
+      scheduleNextRefresh();
     }
   }
 
@@ -428,13 +443,22 @@ document.addEventListener("DOMContentLoaded", function() {
     var enabling = !globalEnabled;
     setGlobalEnabled(enabling);
     if (enabling) {
-      startCountdown();
-      clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+      scheduleNextRefresh();
     } else {
+      refreshDeadlineMs = null;
       clearTimeout(refreshTimer);
       clearInterval(countdownTimer);
       updateCountdown();
+    }
+  });
+
+  document.addEventListener("visibilitychange", function() {
+    if (document.hidden) return;
+    updateCountdown();
+    if (missedRefreshWhileHidden) {
+      missedRefreshWhileHidden = false;
+      clearTimeout(refreshTimer);
+      refresh();
     }
   });
 
