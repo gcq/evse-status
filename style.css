@@ -112,10 +112,28 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.countdown-label {
+.countdown-toggle {
+  display: inline-block;
   font-size: 14px;
   color: var(--text-secondary);
   white-space: nowrap;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.countdown-toggle:active {
+  background: var(--surface);
+  transition-duration: 0.1s;
+}
+
+.countdown-toggle.is-off {
+  color: var(--text-secondary);
+  border-color: var(--border);
+  opacity: 0.75;
 }
 
 /* Fixed width so changing digits don't shift the layout */

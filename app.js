@@ -2,6 +2,7 @@ var REFRESH_INTERVAL = 60;  // seconds
 var refreshTimer = null;
 var countdown = REFRESH_INTERVAL;
 var countdownTimer = null;
+var globalEnabled = true;
 var locationResults = [];
 
 var CONNECTOR_TYPE_LABELS = {
@@ -66,6 +67,12 @@ function computeLimits(connector, rules, capabilities) {
 function renderLimitBadge(limit) {
   var remaining = limit.deadline - Date.now();
   if (remaining <= 0) {
+    var overdueMins = Math.floor(-remaining / 60000);
+    var overdueHours = Math.floor(overdueMins / 60);
+    overdueMins = overdueMins % 60;
+    var overdueText = overdueHours > 0
+      ? "Should have left " + overdueHours + "h " + (overdueMins < 10 ? "0" : "") + overdueMins + "m ago"
+      : "Should have left " + overdueMins + "m ago";
     var lines = [];
     if (limit.sessionUserName) lines.push(limit.sessionUserName);
     if (limit.sessionMinutes != null) {
@@ -76,7 +83,7 @@ function renderLimitBadge(limit) {
       lines.push(timeStr + kwh);
     }
     return '<div class="limit-badge-wrap">' +
-      '<span class="limit-badge limit-overdue">MUST LEAVE</span>' +
+      '<span class="limit-badge limit-overdue">' + overdueText + '</span>' +
       lines.map(function(l) { return '<span class="limit-detail">' + l + '</span>'; }).join("") +
     '</div>';
   }
@@ -84,8 +91,8 @@ function renderLimitBadge(limit) {
   var hours = Math.floor(mins / 60);
   mins = mins % 60;
   var text = hours > 0
-    ? "Leave in " + hours + "h " + (mins < 10 ? "0" : "") + mins + "m"
-    : "Leave in " + mins + "m";
+    ? "Should leave in " + hours + "h " + (mins < 10 ? "0" : "") + mins + "m"
+    : "Should leave in " + mins + "m";
   var cls = remaining < 30 * 60000 ? "limit-urgent" : "limit-ok";
   return '<span class="limit-badge ' + cls + '">' + text + '</span>';
 }
@@ -256,8 +263,20 @@ function setLoading(isLoading) {
 }
 
 function updateCountdown() {
-  var el = document.getElementById("countdown");
-  if (el) el.textContent = countdown;
+  var toggle = document.getElementById("countdown-toggle");
+  if (!toggle) return;
+  if (globalEnabled) {
+    toggle.classList.remove("is-off");
+    var el = document.getElementById("countdown");
+    if (el) {
+      el.textContent = countdown;
+    } else {
+      toggle.innerHTML = 'Next refresh in <span id="countdown">' + countdown + '</span>s';
+    }
+  } else {
+    toggle.classList.add("is-off");
+    toggle.textContent = "Auto-refresh off — tap to resume";
+  }
 }
 
 function startCountdown() {
@@ -268,6 +287,16 @@ function startCountdown() {
     countdown = Math.max(0, countdown - 1);
     updateCountdown();
   }, 1000);
+}
+
+function setGlobalEnabled(value) {
+  globalEnabled = value;
+  var stored = localStorage.getItem("evse_config");
+  var cfg;
+  try { cfg = stored ? JSON.parse(stored) : {}; } catch (e) { cfg = {}; }
+  if (!cfg.refresh) cfg.refresh = {};
+  cfg.refresh.globalEnabled = value;
+  localStorage.setItem("evse_config", JSON.stringify(cfg));
 }
 
 async function refreshSingleLocation(i) {
@@ -290,9 +319,13 @@ async function refreshSingleLocation(i) {
     slot.style.opacity = "";
   }
   renderOosSection();
-  clearTimeout(refreshTimer);
-  startCountdown();
-  refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+  if (globalEnabled) {
+    clearTimeout(refreshTimer);
+    startCountdown();
+    refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+  } else {
+    updateCountdown();
+  }
 }
 
 async function refresh() {
@@ -328,9 +361,13 @@ async function refresh() {
     if (pending === 0) {
       document.getElementById("last-updated-time").textContent = new Date().toLocaleTimeString();
       setLoading(false);
-      startCountdown();
-      clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+      if (globalEnabled) {
+        startCountdown();
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+      } else {
+        updateCountdown();
+      }
     }
   }
 
@@ -364,6 +401,7 @@ document.addEventListener("DOMContentLoaded", function() {
       var cfg = JSON.parse(stored);
       if (cfg.handedness) HANDEDNESS = cfg.handedness;
       if (cfg.locations)  LOCATIONS  = cfg.locations;
+      globalEnabled = (cfg && cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
     } catch (e) {}
   }
 
@@ -372,6 +410,8 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 
   document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "light");
+
+  updateCountdown();
 
   document.getElementById("refresh-btn").addEventListener("click", function() {
     clearTimeout(refreshTimer);
@@ -382,6 +422,20 @@ document.addEventListener("DOMContentLoaded", function() {
     var btn = e.target.closest(".refresh-loc-btn");
     if (!btn) return;
     refreshSingleLocation(parseInt(btn.getAttribute("data-loc-index"), 10));
+  });
+
+  document.getElementById("countdown-toggle").addEventListener("click", function() {
+    var enabling = !globalEnabled;
+    setGlobalEnabled(enabling);
+    if (enabling) {
+      startCountdown();
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(refresh, REFRESH_INTERVAL * 1000);
+    } else {
+      clearTimeout(refreshTimer);
+      clearInterval(countdownTimer);
+      updateCountdown();
+    }
   });
 
   refresh();
