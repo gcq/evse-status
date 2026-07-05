@@ -77,12 +77,23 @@ function geolocate() {
       setBanner(false);
       var lat = pos.coords.latitude;
       var lon = pos.coords.longitude;
+      // map.getBounds() right after setView() can still report the OLD view —
+      // Leaflet hasn't finished applying the pan/zoom yet at that point. Wait
+      // for the moveend this setView triggers (fires once the view is
+      // actually settled), then search immediately using its real bounds,
+      // short-circuiting the persistent moveend handler's 2s debounce below.
+      map.once("moveend", function() {
+        clearTimeout(searchDebounce);
+        var b = map.getBounds();
+        searchAll(lat, lon, {
+          latNE: b.getNorthEast().lat, lngNE: b.getNorthEast().lng,
+          latSW: b.getSouthWest().lat, lngSW: b.getSouthWest().lng
+        });
+      });
       map.setView([lat, lon], 14);
-      clearTimeout(searchDebounce); // setView fires moveend — don't let it trigger a re-search
       L.circleMarker([lat, lon], {
         radius: 9, fillColor: "#3b82f6", color: "#fff", weight: 3, fillOpacity: 1
       }).addTo(map).bindPopup("You are here");
-      searchAll(lat, lon);
     },
     function(err) {
       setStatus("Location blocked: " + err.message + ". Tap to retry.", true);
