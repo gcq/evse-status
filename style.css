@@ -242,11 +242,13 @@ h1 {
 
 .s-field-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
 .s-field-row .s-field {
-  flex: 1;
+  flex: 1 1 160px;
+  min-width: 160px;
 }
 
 .s-label {
