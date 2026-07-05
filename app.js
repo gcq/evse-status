@@ -768,9 +768,15 @@ document.addEventListener("DOMContentLoaded", function() {
     );
   }
 
+  // Ticks on a fixed schedule anchored to page load, independent of when any
+  // given location last refreshed (they can refresh at different times via
+  // per-location/selective auto-refresh). A 1s period left "Xs ago" stuck at
+  // the old value for up to just-under-2s after a refresh, depending on
+  // where in the cycle the refresh happened to land — a shorter period
+  // bounds that worst case tightly without needing per-refresh realignment.
   setInterval(function() {
     if (!document.hidden) tickLastUpdatedTexts();
-  }, 1000);
+  }, 250);
 
   refresh();
 });
