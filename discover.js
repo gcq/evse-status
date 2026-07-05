@@ -295,6 +295,7 @@ function toggleStation(groupKey) {
         var connId = this.dataset.connId;
         var chargerId = this.dataset.chargerId;
         if (this.checked) {
+          if (isConnectorPending(chargerId, connId)) return;
           pendingPins.push({
             groupKey: groupKey,
             cpoKey: group.cpoKey,
@@ -329,9 +330,10 @@ function renderConnectorRow(c, cpoKey, chargerId) {
   var displayName = c.visualRef || typeLabel;
   var kwText = c.kw != null ? c.kw + " kW" : "? kW";
   var alreadyAdded = isConnectorConfigured(cpoKey, chargerId, String(c.id));
+  var isPending = !alreadyAdded && isConnectorPending(chargerId, String(c.id));
   return '<div class="discover-connector' + (alreadyAdded ? ' discover-connector-added' : '') + '">' +
     '<input type="checkbox" class="s-checkbox pin-checkbox"' +
-      (alreadyAdded ? ' checked disabled title="Already added to My Stations"' : '') +
+      (alreadyAdded ? ' checked disabled title="Already added to My Stations"' : (isPending ? ' checked' : '')) +
       ' data-conn-id="' + esc(c.id) + '"' +
       ' data-charger-id="' + esc(chargerId) + '"' +
       ' data-display-name="' + esc(displayName) + '">' +
@@ -488,6 +490,12 @@ function isConnectorConfigured(cpoKey, chargerId, connectorId) {
     }
   }
   return false;
+}
+
+function isConnectorPending(chargerId, connectorId) {
+  return pendingPins.some(function(p) {
+    return p.chargerId === chargerId && p.connectorId === connectorId;
+  });
 }
 
 function setStatus(msg, isError) {

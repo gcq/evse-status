@@ -16,9 +16,23 @@ var maxDistanceKm = null;
 var currentPosition = null;   // { lat, lon } once geolocation resolves, else null
 var locationDistances = [];   // meters, parallel to LOCATIONS; null = unknown
 
+// "HH:MM"-"HH:MM" window, e.g. 22:00-08:00 crosses midnight — handled by
+// wrapping the comparison when start > end.
+function isWithinFreeWindow(freeCharging) {
+  var now = new Date();
+  var nowMin = now.getHours() * 60 + now.getMinutes();
+  var startParts = freeCharging.start.split(":");
+  var endParts = freeCharging.end.split(":");
+  var startMin = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1], 10);
+  var endMin = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1], 10);
+  if (startMin <= endMin) return nowMin >= startMin && nowMin < endMin;
+  return nowMin >= startMin || nowMin < endMin;
+}
+
 function computeLimits(connector, rules, capabilities) {
   var limits = [];
   if (!rules || !capabilities) return limits;
+  if (rules.freeCharging && isWithinFreeWindow(rules.freeCharging)) return limits;
 
   if (rules.mustLeaveWhenNotCharging &&
       capabilities.indexOf("CONNECTED_NOT_CHARGING") >= 0 &&
@@ -53,7 +67,7 @@ function renderLimitBadge(limit) {
     // 495356h 42m ago" once the overdue text started showing computed
     // durations instead of a fixed "MUST LEAVE" string).
     var lines = [];
-    if (limit.sessionUserName) lines.push(limit.sessionUserName);
+    if (limit.sessionUserName) lines.push(esc(limit.sessionUserName));
     if (limit.sessionMinutes != null) {
       var h = Math.floor(limit.sessionMinutes / 60);
       var m = limit.sessionMinutes % 60;
@@ -207,8 +221,8 @@ async function fetchLocation(locConfig) {
 
 function renderConnector(connector, context, isOos) {
   var statusClass = STATUS_CLASSES[connector.status] || "status-unknown";
-  var statusLabel = STATUS_LABELS[connector.status] || connector.status;
-  var typeLabel = CONNECTOR_TYPE_LABELS[connector.type] || connector.type;
+  var statusLabel = esc(STATUS_LABELS[connector.status] || connector.status);
+  var typeLabel = esc(CONNECTOR_TYPE_LABELS[connector.type] || connector.type);
   var notLive = connector.realtime === false
     ? '<span class="not-live" title="Status not updated in real time">not live</span>'
     : "";
@@ -224,7 +238,7 @@ function renderConnector(connector, context, isOos) {
   // Visual: [limit-badge][time][not-live?][status-badge]
   return '<div class="connector' + (isOos ? ' connector-oos' : '') + '">' +
     '<div class="connector-info">' +
-      '<span class="connector-name">' + connector.displayName + '</span>' +
+      '<span class="connector-name">' + esc(connector.displayName) + '</span>' +
       '<span class="connector-type">' + typeLabel + (connector.kw != null ? ' &middot; ' + connector.kw + ' kW' : '') + '</span>' +
     '</div>' +
     '<div class="connector-status">' +
@@ -240,7 +254,7 @@ function renderCardSkeleton(loc) {
   var connSkeleton = loc.connectors.map(function(c) {
     return '<div class="connector">' +
       '<div class="connector-info">' +
-        '<span class="connector-name">' + (c.displayName || c.id) + '</span>' +
+        '<span class="connector-name">' + esc(c.displayName || c.id) + '</span>' +
         '<span class="skeleton-line" style="width:90px"></span>' +
       '</div>' +
       '<div class="connector-status">' +
@@ -250,8 +264,8 @@ function renderCardSkeleton(loc) {
   }).join('');
   return '<div class="card">' +
     '<div class="card-header">' +
-      '<span class="location-name">' + loc.displayName + '</span>' +
-      '<span class="cpo-badge">' + loc.cpo + '</span>' +
+      '<span class="location-name">' + esc(loc.displayName) + '</span>' +
+      '<span class="cpo-badge">' + esc(loc.cpo) + '</span>' +
     '</div>' +
     '<div class="location-address"><span class="skeleton-line" style="width:140px"></span></div>' +
     '<div class="connectors">' + connSkeleton + '</div>' +
@@ -273,8 +287,8 @@ function renderCardBody(location, index, connectors, headerButtonsHtml, extraCla
   return '<div class="card' + (extraClass ? ' ' + extraClass : '') + '">' +
     '<div class="card-header">' +
       headerButtonsHtml +
-      '<span class="location-name">' + location.displayName + '</span>' +
-      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
+      '<span class="location-name">' + esc(location.displayName) + '</span>' +
+      '<span class="cpo-badge">' + esc(location.cpo || "Unknown") + '</span>' +
     '</div>' +
     renderAddressLine(location, index) +
     '<div class="connectors">' + connectorsHtml + '</div>' +
@@ -284,8 +298,8 @@ function renderCardBody(location, index, connectors, headerButtonsHtml, extraCla
 function renderCard(location, index) {
   if (location.error) {
     return '<div class="card card-error">' +
-      '<div class="card-header"><span class="location-name">' + location.displayName + '</span></div>' +
-      '<div class="card-error-msg">' + location.error + '</div>' +
+      '<div class="card-header"><span class="location-name">' + esc(location.displayName) + '</span></div>' +
+      '<div class="card-error-msg">' + esc(location.error) + '</div>' +
     '</div>';
   }
 
@@ -318,7 +332,7 @@ function renderAddressLine(location, index) {
   var distM = index != null ? locationDistances[index] : null;
   var lastUpdated = index != null ? locationLastUpdated[index] : null;
   var parts = [];
-  if (location.address) parts.push(location.address);
+  if (location.address) parts.push(esc(location.address));
   if (distM != null) parts.push(formatDistance(distM) + " away");
   if (lastUpdated) {
     parts.push('Updated <span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
@@ -327,7 +341,7 @@ function renderAddressLine(location, index) {
   // Soft signal for a merged multi-charger location where one sibling
   // charger's fetch failed but others succeeded — not the hard red
   // card-error state, since most of the location is still showing live data.
-  if (location.warning) parts.push('<span class="location-warning">' + location.warning + '</span>');
+  if (location.warning) parts.push('<span class="location-warning">' + esc(location.warning) + '</span>');
   return parts.length ? '<div class="location-address">' + parts.join(" · ") + '</div>' : '';
 }
 
