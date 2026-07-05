@@ -268,8 +268,19 @@ function renderAddressLine(location, index) {
   var parts = [];
   if (location.address) parts.push(location.address);
   if (distM != null) parts.push(formatDistance(distM) + " away");
-  if (lastUpdated) parts.push("Updated " + formatRelativeTime(lastUpdated));
+  if (lastUpdated) {
+    parts.push('Updated <span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
+      formatRelativeTime(lastUpdated) + '</span>');
+  }
   return parts.length ? '<div class="location-address">' + parts.join(" · ") + '</div>' : '';
+}
+
+// Ticks the "Updated Xs ago" text on every card without a full re-render,
+// so it doesn't visibly freeze at "0s ago" between refreshes.
+function tickLastUpdatedTexts() {
+  document.querySelectorAll(".last-updated-text").forEach(function(el) {
+    el.textContent = formatRelativeTime(el.dataset.updatedAt);
+  });
 }
 
 function renderHiddenCard(location, index) {
@@ -756,6 +767,10 @@ document.addEventListener("DOMContentLoaded", function() {
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
     );
   }
+
+  setInterval(function() {
+    if (!document.hidden) tickLastUpdatedTexts();
+  }, 1000);
 
   refresh();
 });

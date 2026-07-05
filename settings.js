@@ -106,30 +106,32 @@ function buildGlobal() {
 
   return '<section class="s-section">' +
     '<h2 class="s-section-title">Display</h2>' +
-    '<div class="s-field">' +
-      '<label class="s-label">Theme</label>' +
-      segmentedControl("g-theme", [
-        { value: "auto",  label: "Auto" },
-        { value: "dark",  label: "Dark" },
-        { value: "light", label: "Light" }
-      ], state.theme || "auto") +
-      '<span class="s-hint" id="system-theme-hint">' + systemThemeHint() + '</span>' +
-    '</div>' +
-    '<div class="s-field">' +
-      '<label class="s-label">Driving side</label>' +
-      segmentedControl("g-handedness", [
-        { value: "right", label: "Right" },
-        { value: "left",  label: "Left" }
-      ], state.handedness || "right") +
-      '<span class="s-hint">Controls move to the opposite side, near your hand</span>' +
-    '</div>' +
-    '<div class="s-field">' +
-      '<label class="s-label">Location order</label>' +
-      segmentedControl("g-location-order", [
-        { value: "config",   label: "Manual" },
-        { value: "distance", label: "Distance" }
-      ], state.locationOrder || "config") +
-      '<span class="s-hint">Distance mode uses your live location (high-accuracy GPS) to sort and can affect battery use</span>' +
+    '<div class="s-field-row">' +
+      '<div class="s-field">' +
+        '<label class="s-label">Theme</label>' +
+        segmentedControl("g-theme", [
+          { value: "auto",  label: "Auto" },
+          { value: "dark",  label: "Dark" },
+          { value: "light", label: "Light" }
+        ], state.theme || "auto") +
+        '<span class="s-hint" id="system-theme-hint">' + systemThemeHint() + '</span>' +
+      '</div>' +
+      '<div class="s-field">' +
+        '<label class="s-label">Driving side</label>' +
+        segmentedControl("g-handedness", [
+          { value: "right", label: "Right" },
+          { value: "left",  label: "Left" }
+        ], state.handedness || "right") +
+        '<span class="s-hint">Controls move to the opposite side, near your hand</span>' +
+      '</div>' +
+      '<div class="s-field">' +
+        '<label class="s-label">Location order</label>' +
+        segmentedControl("g-location-order", [
+          { value: "config",   label: "Manual" },
+          { value: "distance", label: "Distance" }
+        ], state.locationOrder || "config") +
+        '<span class="s-hint">Distance mode uses your live location (high-accuracy GPS) to sort</span>' +
+      '</div>' +
     '</div>' +
     distanceRelatedFields +
   '</section>';
