@@ -30,14 +30,6 @@ function defaultConfig() {
   };
 }
 
-function emptyLocation() {
-  return { id: "", cpo: "electromaps", displayName: "", lat: null, lon: null, rules: null, connectors: [] };
-}
-
-function emptyConnector() {
-  return { id: "", displayName: "" };
-}
-
 // ── HTML helpers ──────────────────────────────────────────────────────────
 
 function esc(s) {
@@ -143,10 +135,7 @@ function buildLocations() {
   return '<section class="s-section">' +
     '<div class="s-section-header">' +
       '<h2 class="s-section-title">Locations</h2>' +
-      '<div style="display:flex;gap:8px">' +
-        '<button class="btn btn-ghost" id="add-manual-btn">Add manually</button>' +
-        '<button class="btn btn-primary" id="add-loc-btn">Find nearby</button>' +
-      '</div>' +
+      '<button class="btn btn-primary" id="add-loc-btn">Find nearby</button>' +
     '</div>' +
     noLocError +
     locCards +
@@ -168,7 +157,7 @@ function buildLocation(loc, li) {
     '<div class="s-field-row">' +
       '<div class="s-field">' +
         '<label class="s-label">CPO</label>' +
-        '<select class="s-input s-select loc-cpo-select" data-li="' + li + '" data-fid="loc-' + li + '-cpo" disabled>' +
+        '<select class="s-input s-select" data-fid="loc-' + li + '-cpo" disabled>' +
           getCpoOptions(loc.cpo) +
         '</select>' +
         '<span class="s-error" data-err="loc-' + li + '-cpo"></span>' +
@@ -235,8 +224,7 @@ function buildLocation(loc, li) {
 
   var rightCol =
     '<span class="s-error" data-err="loc-' + li + '-connectors"></span>' +
-    buildConnectors(loc, li) +
-    '<button class="btn btn-ghost add-conn-btn" data-li="' + li + '">+ Add connector</button>';
+    buildConnectors(loc, li);
 
   var total = state.locations.length;
   return '<div class="s-card loc-card" data-li="' + li + '">' +
@@ -325,13 +313,6 @@ function bindFormEvents() {
     window.location.href = "discover.html";
   });
 
-  document.getElementById("add-manual-btn").addEventListener("click", function() {
-    collectIntoState();
-    state.locations.push(emptyLocation());
-    render();
-    document.querySelector('.loc-card:last-child').scrollIntoView({ behavior: "smooth" });
-  });
-
   document.querySelectorAll(".remove-loc-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
       var li = +this.dataset.li;
@@ -365,34 +346,12 @@ function bindFormEvents() {
     });
   });
 
-  document.querySelectorAll(".add-conn-btn").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      var li = +this.dataset.li;
-      collectIntoState();
-      state.locations[li].connectors.push(emptyConnector());
-      render();
-      // Focus the new connector's ID field
-      var cards = document.querySelectorAll(".loc-card");
-      var lastRow = cards[li].querySelector(".conn-row:last-of-type");
-      if (lastRow) lastRow.querySelector(".s-input").focus();
-    });
-  });
-
   document.querySelectorAll(".remove-conn-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
       var li = +this.dataset.li;
       var ci = +this.dataset.ci;
       collectIntoState();
       state.locations[li].connectors.splice(ci, 1);
-      render();
-    });
-  });
-
-  document.querySelectorAll(".loc-cpo-select").forEach(function(sel) {
-    sel.addEventListener("change", function() {
-      var li = +this.dataset.li;
-      collectIntoState();
-      state.locations[li].cpo = this.value;
       render();
     });
   });
