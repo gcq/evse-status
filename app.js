@@ -636,29 +636,39 @@ async function autoRefreshTick() {
   scheduleNextRefresh();
 }
 
-async function updateLocationCard(i) {
+// Fetches one location, updates its card slot (if present) and the global
+// out-of-service/hidden/out-of-range sections. Never throws — a fetch
+// failure becomes an error-state result like any other, since callers just
+// need to know when this location is done, not whether it succeeded.
+async function fetchAndRenderLocation(i) {
   var loc = window.LOCATIONS[i];
-  var slot = document.getElementById("card-slot-" + i);
-  if (!slot) return;
-  slot.style.opacity = "0.5";
+  var result;
   try {
-    var result = await fetchLocation(loc);
-    locationResults[i] = result;
+    result = await fetchLocation(loc);
     locationLastUpdated[i] = new Date().toISOString();
+  } catch (e) {
+    result = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
+  }
+  locationResults[i] = result;
+
+  var slot = document.getElementById("card-slot-" + i);
+  if (slot) {
     var html = renderCard(result, i);
     slot.innerHTML = html;
     slot.style.display = html ? "" : "none";
     slot.style.opacity = "";
-  } catch (e) {
-    var errResult = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
-    locationResults[i] = errResult;
-    slot.innerHTML = renderCard(errResult, i);
-    slot.style.display = "";
-    slot.style.opacity = "";
   }
+
   renderOosSection();
   renderHiddenSection();
   renderOutOfRangeSection();
+}
+
+async function updateLocationCard(i) {
+  var slot = document.getElementById("card-slot-" + i);
+  if (!slot) return;
+  slot.style.opacity = "0.5";
+  await fetchAndRenderLocation(i);
 }
 
 async function refreshSingleLocation(i) {
@@ -703,31 +713,8 @@ async function refresh() {
     }
   }
 
-  LOCATIONS.forEach(function(loc, i) {
-    fetchLocation(loc).then(function(result) {
-      locationResults[i] = result;
-      locationLastUpdated[i] = new Date().toISOString();
-      var slot = document.getElementById("card-slot-" + i);
-      if (slot) {
-        var html = renderCard(result, i);
-        slot.innerHTML = html;
-        slot.style.display = html ? "" : "none";
-        slot.style.opacity = "";
-      }
-      renderOosSection();
-      renderHiddenSection();
-      renderOutOfRangeSection();
-      oneDone();
-    }).catch(function(e) {
-      var errResult = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
-      locationResults[i] = errResult;
-      var slot = document.getElementById("card-slot-" + i);
-      if (slot) { slot.innerHTML = renderCard(errResult, i); slot.style.display = ""; slot.style.opacity = ""; }
-      renderOosSection();
-      renderHiddenSection();
-      renderOutOfRangeSection();
-      oneDone();
-    });
+  LOCATIONS.forEach(function(_, i) {
+    fetchAndRenderLocation(i).then(oneDone);
   });
 }
 
