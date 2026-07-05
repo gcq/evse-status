@@ -16,37 +16,6 @@ var maxDistanceKm = null;
 var currentPosition = null;   // { lat, lon } once geolocation resolves, else null
 var locationDistances = [];   // meters, parallel to LOCATIONS; null = unknown
 
-var CONNECTOR_TYPE_LABELS = {
-  IEC_62196_T2: "Type 2",
-  IEC_62196_T2_COMBO: "CCS",
-  CHADEMO: "CHAdeMO",
-  DOMESTIC_E: "Schuko"
-};
-
-var STATUS_LABELS = {
-  AVAILABLE:              "Available",
-  PREPARING:              "Preparing",
-  OCCUPIED:               "Occupied",
-  CONNECTED_NOT_CHARGING: "Connected",
-  FINISHING:              "Finishing",
-  RESERVED:               "Reserved",
-  OUT_OF_SERVICE:         "Out of service",
-  WORKING:                "Working",
-  UNKNOWN:                "Unknown"
-};
-
-var STATUS_CLASSES = {
-  AVAILABLE:              "status-available",
-  PREPARING:              "status-preparing",
-  OCCUPIED:               "status-occupied",
-  CONNECTED_NOT_CHARGING: "status-occupied",
-  FINISHING:              "status-finishing",
-  RESERVED:               "status-reserved",
-  OUT_OF_SERVICE:         "status-oos",
-  WORKING:                "status-unknown",
-  UNKNOWN:                "status-unknown"
-};
-
 function computeLimits(connector, rules, capabilities) {
   var limits = [];
   if (!rules || !capabilities) return limits;

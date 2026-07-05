@@ -22,31 +22,6 @@ var MARKER_DEFAULT = { radius: 7, fillColor: "#1e293b", color: "#3b82f6", weight
 var MARKER_HOVER   = { radius: 9, fillColor: "#3b82f6", color: "#fff",    weight: 3, fillOpacity: 1 };
 var MARKER_OPEN    = { radius: 9, fillColor: "#f59e0b", color: "#fff",    weight: 3, fillOpacity: 1 };
 
-var CONNECTOR_TYPE_LABELS = {
-  IEC_62196_T2: "Type 2",
-  IEC_62196_T2_COMBO: "CCS",
-  CHADEMO: "CHAdeMO",
-  DOMESTIC_E: "Schuko"
-};
-
-var STATUS_LABELS = {
-  AVAILABLE: "Available",
-  OCCUPIED: "Occupied",
-  CONNECTED_NOT_CHARGING: "Connected",
-  OUT_OF_SERVICE: "Out of service",
-  WORKING: "Working",
-  UNKNOWN: "Unknown"
-};
-
-var STATUS_CLASSES = {
-  AVAILABLE: "status-available",
-  OCCUPIED: "status-occupied",
-  CONNECTED_NOT_CHARGING: "status-occupied",
-  OUT_OF_SERVICE: "status-oos",
-  WORKING: "status-unknown",
-  UNKNOWN: "status-unknown"
-};
-
 function esc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
