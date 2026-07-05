@@ -521,20 +521,16 @@ function startCountdown() {
 
 function setGlobalEnabled(value) {
   globalEnabled = value;
-  var stored = localStorage.getItem("evse_config");
-  var cfg;
-  try { cfg = stored ? JSON.parse(stored) : {}; } catch (e) { cfg = {}; }
+  var cfg = getConfig() || {};
   if (!cfg.refresh) cfg.refresh = {};
   cfg.refresh.globalEnabled = value;
-  localStorage.setItem("evse_config", JSON.stringify(cfg));
+  setConfig(cfg);
 }
 
 function persistLocations() {
-  var stored = localStorage.getItem("evse_config");
-  var cfg;
-  try { cfg = stored ? JSON.parse(stored) : {}; } catch (e) { cfg = {}; }
+  var cfg = getConfig() || {};
   cfg.locations = LOCATIONS;
-  localStorage.setItem("evse_config", JSON.stringify(cfg));
+  setConfig(cfg);
 }
 
 // Auto-refresh runs in one of three modes: "all" (globalEnabled), "selected"
@@ -688,19 +684,16 @@ async function refresh() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-  var stored = localStorage.getItem("evse_config");
-  if (stored) {
-    try {
-      var cfg = JSON.parse(stored);
-      if (cfg.handedness) HANDEDNESS = cfg.handedness;
-      if (cfg.locations)  LOCATIONS  = cfg.locations;
-      if (cfg.maxDistanceKm) maxDistanceKm = cfg.maxDistanceKm;
-      if (cfg.locationOrder === "distance") locationOrder = "distance";
-      globalEnabled = (cfg && cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
-      // Defensive: "all locations" mode and per-location auto-refresh are
-      // mutually exclusive — don't trust stale/hand-edited config to agree.
-      if (globalEnabled) LOCATIONS.forEach(function(loc) { loc.autoRefresh = false; });
-    } catch (e) {}
+  var cfg = getConfig();
+  if (cfg) {
+    if (cfg.handedness) HANDEDNESS = cfg.handedness;
+    if (cfg.locations)  LOCATIONS  = cfg.locations;
+    if (cfg.maxDistanceKm) maxDistanceKm = cfg.maxDistanceKm;
+    if (cfg.locationOrder === "distance") locationOrder = "distance";
+    globalEnabled = (cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
+    // Defensive: "all locations" mode and per-location auto-refresh are
+    // mutually exclusive — don't trust stale/hand-edited config to agree.
+    if (globalEnabled) LOCATIONS.forEach(function(loc) { loc.autoRefresh = false; });
   }
 
   if (typeof HANDEDNESS !== "undefined" && HANDEDNESS === "left") {

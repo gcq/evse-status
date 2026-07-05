@@ -1,3 +1,15 @@
+var CONFIG_STORAGE_KEY = "evse_config";
+
+function getConfig() {
+  var stored = localStorage.getItem(CONFIG_STORAGE_KEY);
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch (e) { return null; }
+}
+
+function setConfig(cfg) {
+  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
+}
+
 function haversineM(lat1, lon1, lat2, lon2) {
   var R = 6371000;
   var phi1 = lat1 * Math.PI / 180, phi2 = lat2 * Math.PI / 180;

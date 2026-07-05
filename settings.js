@@ -1,4 +1,3 @@
-var STORAGE_KEY = "evse_config";
 var state = null;
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
@@ -11,11 +10,7 @@ function init() {
 }
 
 function loadConfig() {
-  var stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try { return JSON.parse(stored); } catch (e) {}
-  }
-  return defaultConfig();
+  return getConfig() || defaultConfig();
 }
 
 function defaultConfig() {
@@ -332,7 +327,7 @@ function bindFormEvents() {
 
   document.getElementById("add-loc-btn").addEventListener("click", function() {
     collectIntoState();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    setConfig(state);
     window.location.href = "discover.html";
   });
 
@@ -528,13 +523,13 @@ function save() {
     showErrors(errors);
     return;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  setConfig(state);
   window.location.href = "index.html";
 }
 
 function resetToDefaults() {
   if (!confirm("Reset all settings to the built-in defaults from config.js?")) return;
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(CONFIG_STORAGE_KEY);
   state = defaultConfig();
   render();
 }

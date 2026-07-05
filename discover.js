@@ -384,9 +384,7 @@ function updateAddButton() {
 function pinSelected() {
   if (pendingPins.length === 0) return;
 
-  var stored = localStorage.getItem("evse_config");
-  var cfg;
-  try { cfg = stored ? JSON.parse(stored) : null; } catch (e) { cfg = null; }
+  var cfg = getConfig();
   if (!cfg) {
     cfg = {
       handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
@@ -458,7 +456,7 @@ function pinSelected() {
     }
   });
 
-  localStorage.setItem("evse_config", JSON.stringify(cfg));
+  setConfig(cfg);
   window.location.href = "settings.html";
 }
 
@@ -489,11 +487,8 @@ function updateMarkerStyle(key) {
 }
 
 function loadExistingLocations() {
-  try {
-    var stored = localStorage.getItem("evse_config");
-    var cfg = stored ? JSON.parse(stored) : null;
-    if (cfg && cfg.locations) return cfg.locations;
-  } catch (e) {}
+  var cfg = getConfig();
+  if (cfg && cfg.locations) return cfg.locations;
   return (typeof LOCATIONS !== "undefined") ? LOCATIONS : [];
 }
 
