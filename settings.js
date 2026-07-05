@@ -259,13 +259,9 @@ function buildConnector(conn, li, ci) {
   '</div>';
 }
 
-// TODO(hierarchy): loc.id is really a Charger/ChargePoint id, not a true
-// Location/site id — a location only spans multiple chargers when some of
-// its connectors carry a chargerId that differs from loc.id (set by
-// discover.js's pinSelected() when merging chargers at one evcharge site).
-// This is derived on the fly rather than stored, so it can never drift out
-// of sync with the connectors array (e.g. removing a sibling's connectors
-// here automatically "unmerges" it — see app.js's fetchLocation).
+// Derived on the fly rather than stored (see MODEL(hierarchy) note in
+// config.js), so it can never drift out of sync with the connectors array —
+// e.g. removing a sibling's connectors here automatically "unmerges" it.
 function mergedChargerIds(loc) {
   var extra = {};
   loc.connectors.forEach(function(c) {

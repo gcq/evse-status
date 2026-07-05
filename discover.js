@@ -1,15 +1,7 @@
 var map = null;
+// `stations` is a flat list of individual chargers; `stationGroups` below
+// groups them by site (see MODEL(hierarchy) note in config.js).
 var stations = [];
-// TODO(hierarchy): the real model here is Location (site) -> Charger/
-// ChargePoint (one physical cabinet, e.g. evcharge's id_charger) -> Connector
-// (one physical plug). `stations` is still a flat list of individual
-// chargers; `stationGroups` below groups them by site so multiple chargers
-// at one address collapse into one Location entry. This app still doesn't
-// model a distinct EVSE level (a ChargePoint can house any number of EVSEs
-// and any number of connectors independently of each other) — everything
-// under a Charger is treated as a flat connector list. Electromaps exposes
-// no analogous multi-charger-per-site signal, so its locations stay 1:1
-// with chargers here; only evcharge groups.
 var stationGroups = [];
 var pendingPins = [];
 var stationMarkers = [];
@@ -274,11 +266,8 @@ function toggleStation(groupKey) {
     return;
   }
 
-  // TODO(hierarchy): each group.members[i] is one Charger/ChargePoint at this
-  // Location; fetching every member individually and merging the results
-  // here (and again in app.js's fetchLocation, for already-pinned locations)
-  // is the Location->Charger grouping this app was missing. Still no
-  // distinct EVSE level between Charger and Connector.
+  // Each group.members[i] is one Charger/ChargePoint at this Location (see
+  // MODEL(hierarchy) note in config.js); fetch every member and merge results.
   Promise.allSettled(group.members.map(function(m) {
     return adapter.fetchLocation(m.id, []).then(function(loc) {
       return { chargerId: m.id, loc: loc };
@@ -482,10 +471,9 @@ function loadExistingLocations() {
   return (typeof LOCATIONS !== "undefined") ? LOCATIONS : [];
 }
 
-// TODO(hierarchy): loc.id is really a Charger id, not a Location/site id (see
-// top-of-file note). This checks whether a given (charger, connector) pair
-// is already configured under any existing Location, whether as that
-// Location's primary charger or one of its merged-in siblings.
+// Checks whether a given (charger, connector) pair is already configured
+// under any existing Location, whether as that Location's primary charger
+// (loc.id, see MODEL(hierarchy) note in config.js) or a merged-in sibling.
 function isConnectorConfigured(cpoKey, chargerId, connectorId) {
   for (var i = 0; i < existingLocations.length; i++) {
     var loc = existingLocations[i];

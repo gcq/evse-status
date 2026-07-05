@@ -107,13 +107,8 @@ function uniq(arr) {
   return out;
 }
 
-// TODO(hierarchy): the real model is Location (site) -> Charger/ChargePoint
-// (one physical cabinet, `id`/`chargerId` below) -> Connector. `locConfig.id`
-// is really a Charger id, not a Location id — a location entry only spans
-// multiple chargers when its connectors' `chargerId` fields say so (set by
-// discover.js's pinSelected() when merging chargers at one evcharge site).
-// No distinct EVSE level is modeled between Charger and Connector anywhere
-// in this app.
+// locConfig.id is really a Charger id, not a Location id (see MODEL(hierarchy)
+// note in config.js) — merges every charger under locConfig's connectors.
 async function fetchLocation(locConfig) {
   var adapter = getAdapter(locConfig.cpo);
   if (!adapter) throw new Error("No adapter for CPO: " + locConfig.cpo);

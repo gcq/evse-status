@@ -76,7 +76,7 @@ ADAPTERS.evcharge = {
           // pair) — from the RAW strings, not the parsed cLat/cLon above, so
           // equality is exact rather than incidentally relying on parseFloat
           // determinism. Lets discover.js group multiple chargers into one
-          // Location card. See TODO(hierarchy) in app.js's fetchLocation.
+          // Location card. See MODEL(hierarchy) note in config.js.
           //
           // TODO(hierarchy): this exact-string match misses real-world
           // duplicates when the provider itself never assigned a shared site

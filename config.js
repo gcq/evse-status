@@ -1,3 +1,17 @@
+// MODEL(hierarchy): the real-world model is Location (site) -> Charger/
+// ChargePoint (one physical cabinet, e.g. evcharge's id_charger) -> Connector
+// (one physical plug). A `Location` config entry's `id` is really a Charger
+// id, not a true Location/site id — an entry only spans multiple chargers
+// when some of its connectors carry a `chargerId` that differs from `id`
+// (set by discover.js's pinSelected() when merging chargers at one evcharge
+// site; app.js's fetchLocation() and settings.js's mergedChargerIds() both
+// derive the grouping from that field rather than storing it separately).
+// This app still doesn't model a distinct EVSE level — a ChargePoint can
+// house any number of EVSEs and any number of connectors independently of
+// each other, but everything under a Charger here is a flat connector list.
+// Electromaps exposes no multi-charger-per-site signal, so its locations
+// stay 1:1 with chargers; only evcharge groups.
+
 // "right" = right-handed (controls on LEFT, near right thumb) | "left" = left-handed (controls on RIGHT, near left thumb)
 var HANDEDNESS = "right";
 
