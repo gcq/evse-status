@@ -243,7 +243,11 @@ function toggleStation(stationId, cpoKey) {
 function renderConnectorRow(c) {
   var statusCls = STATUS_CLASSES[c.status] || "status-unknown";
   var statusLabel = STATUS_LABELS[c.status] || c.status;
-  if (c.status === "UNKNOWN") statusLabel = "? " + (c.rawStatus || "(nil)");
+  // rawStatus is only set when a provider sends a status code we can't map
+  // (see evcharge.js) — show it for visibility. A literal "UNKNOWN" status
+  // (e.g. Electromaps reporting it lost live data for a connector) has no
+  // raw value to show and just uses the plain "Unknown" label above.
+  if (c.status === "UNKNOWN" && c.rawStatus) statusLabel = "? " + c.rawStatus;
   var typeLabel = CONNECTOR_TYPE_LABELS[c.type] || c.type;
   var displayName = c.visualRef || typeLabel;
   var kwText = c.kw != null ? c.kw + " kW" : "? kW";
