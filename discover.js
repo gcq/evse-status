@@ -2,7 +2,14 @@ var map = null;
 var stations = [];
 var pendingPins = [];
 var stationMarkers = [];
+var stationMarkersByKey = {}; // "cpoKey:id" -> Leaflet marker
+var openStationKeys = {};     // "cpoKey:id" -> true while its card is expanded
+var existingLocations = [];   // snapshot of already-configured locations, loaded once
 var searchDebounce = null;
+
+var MARKER_DEFAULT = { radius: 7, fillColor: "#1e293b", color: "#3b82f6", weight: 2, fillOpacity: 0.95 };
+var MARKER_HOVER   = { radius: 9, fillColor: "#3b82f6", color: "#fff",    weight: 3, fillOpacity: 1 };
+var MARKER_OPEN    = { radius: 9, fillColor: "#f59e0b", color: "#fff",    weight: 3, fillOpacity: 1 };
 
 var CONNECTOR_TYPE_LABELS = {
   IEC_62196_T2: "Type 2",
@@ -38,6 +45,8 @@ function esc(s) {
 // ── Init ──────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", function() {
+  existingLocations = loadExistingLocations();
+
   map = L.map("map").setView([41.4, 2.17], 13);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
@@ -150,22 +159,44 @@ function renderResults() {
 
   stations.forEach(function(s) {
     if (!isNaN(s.lat) && !isNaN(s.lon)) {
-      var marker = L.circleMarker([s.lat, s.lon], {
-        radius: 7, fillColor: "#1e293b", color: "#3b82f6", weight: 2, fillOpacity: 0.95
-      }).addTo(map).bindPopup("<b>" + esc(s.name) + "</b><br>" + formatDist(s.distanceM));
+      var key = stationKey(s.cpoKey, s.id);
+      var marker = L.circleMarker([s.lat, s.lon], MARKER_DEFAULT).addTo(map);
       stationMarkers.push(marker);
+      stationMarkersByKey[key] = marker;
 
+      // No popup — hovering/clicking a POI drives the matching list row instead.
+      marker.on("mouseover", function() {
+        marker.setStyle(MARKER_HOVER);
+        var card = findCard(s.cpoKey, s.id);
+        if (card) card.classList.add("map-hover");
+      });
+      marker.on("mouseout", function() {
+        marker.setStyle(baseMarkerStyle(key));
+        var card = findCard(s.cpoKey, s.id);
+        if (card) card.classList.remove("map-hover");
+      });
       marker.on("click", function() {
-        var card = document.querySelector('.discover-station[data-sid="' + s.id + '"][data-cpo="' + s.cpoKey + '"]');
-        if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); }
+        toggleStation(s.id, s.cpoKey);
+        var card = findCard(s.cpoKey, s.id);
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
       });
     }
   });
 
   container.querySelectorAll(".discover-station-header").forEach(function(header) {
+    var card = header.closest(".discover-station");
+    var key = stationKey(card.dataset.cpo, card.dataset.sid);
+
     header.addEventListener("click", function() {
-      var card = this.closest(".discover-station");
       toggleStation(card.dataset.sid, card.dataset.cpo);
+    });
+    header.addEventListener("mouseenter", function() {
+      var marker = stationMarkersByKey[key];
+      if (marker) marker.setStyle(MARKER_HOVER);
+    });
+    header.addEventListener("mouseleave", function() {
+      var marker = stationMarkersByKey[key];
+      if (marker) marker.setStyle(baseMarkerStyle(key));
     });
   });
 }
@@ -194,17 +225,21 @@ function formatDist(m) {
 // ── Expand station ────────────────────────────────────────────────────────
 
 function toggleStation(stationId, cpoKey) {
-  var card = document.querySelector('.discover-station[data-sid="' + stationId + '"][data-cpo="' + cpoKey + '"]');
+  var card = findCard(cpoKey, stationId);
   var connDiv = document.getElementById("dc-" + cpoKey + "-" + stationId);
   if (!card || !connDiv) return;
+  var key = stationKey(cpoKey, stationId);
 
   if (connDiv.dataset.loaded === "1") {
-    card.classList.toggle("open");
+    openStationKeys[key] = card.classList.toggle("open");
+    updateMarkerStyle(key);
     return;
   }
 
   connDiv.innerHTML = '<div class="discover-loading">Loading connectors…</div>';
   card.classList.add("open");
+  openStationKeys[key] = true;
+  updateMarkerStyle(key);
 
   var adapter = window.ADAPTERS && window.ADAPTERS[cpoKey];
   if (!adapter) {
@@ -220,10 +255,10 @@ function toggleStation(stationId, cpoKey) {
       return;
     }
     connDiv.innerHTML = location.connectors.map(function(c) {
-      return renderConnectorRow(c);
+      return renderConnectorRow(c, cpoKey, stationId);
     }).join("");
 
-    connDiv.querySelectorAll(".pin-checkbox").forEach(function(cb) {
+    connDiv.querySelectorAll(".pin-checkbox:not(:disabled)").forEach(function(cb) {
       cb.addEventListener("change", function() {
         var connId = this.dataset.connId;
         if (this.checked) {
@@ -251,7 +286,7 @@ function toggleStation(stationId, cpoKey) {
   });
 }
 
-function renderConnectorRow(c) {
+function renderConnectorRow(c, cpoKey, stationId) {
   var statusCls = STATUS_CLASSES[c.status] || "status-unknown";
   var statusLabel = STATUS_LABELS[c.status] || c.status;
   // rawStatus is only set when a provider sends a status code we can't map
@@ -262,8 +297,10 @@ function renderConnectorRow(c) {
   var typeLabel = CONNECTOR_TYPE_LABELS[c.type] || c.type;
   var displayName = c.visualRef || typeLabel;
   var kwText = c.kw != null ? c.kw + " kW" : "? kW";
-  return '<div class="discover-connector">' +
+  var alreadyAdded = isConnectorConfigured(cpoKey, stationId, String(c.id));
+  return '<div class="discover-connector' + (alreadyAdded ? ' discover-connector-added' : '') + '">' +
     '<input type="checkbox" class="s-checkbox pin-checkbox"' +
+      (alreadyAdded ? ' checked disabled title="Already added to My Stations"' : '') +
       ' data-conn-id="' + esc(c.id) + '"' +
       ' data-display-name="' + esc(displayName) + '">' +
     '<div class="discover-connector-info">' +
@@ -351,6 +388,46 @@ function pinSelected() {
 function clearStationMarkers() {
   stationMarkers.forEach(function(m) { m.remove(); });
   stationMarkers = [];
+  stationMarkersByKey = {};
+  openStationKeys = {};
+}
+
+function stationKey(cpoKey, id) {
+  return cpoKey + ":" + id;
+}
+
+function findCard(cpoKey, id) {
+  return document.querySelector('.discover-station[data-sid="' + id + '"][data-cpo="' + cpoKey + '"]');
+}
+
+function baseMarkerStyle(key) {
+  return openStationKeys[key] ? MARKER_OPEN : MARKER_DEFAULT;
+}
+
+function updateMarkerStyle(key) {
+  var marker = stationMarkersByKey[key];
+  if (marker) marker.setStyle(baseMarkerStyle(key));
+}
+
+function loadExistingLocations() {
+  try {
+    var stored = localStorage.getItem("evse_config");
+    var cfg = stored ? JSON.parse(stored) : null;
+    if (cfg && cfg.locations) return cfg.locations;
+  } catch (e) {}
+  return (typeof LOCATIONS !== "undefined") ? LOCATIONS : [];
+}
+
+function isConnectorConfigured(cpoKey, stationId, connectorId) {
+  for (var i = 0; i < existingLocations.length; i++) {
+    var loc = existingLocations[i];
+    if (loc.cpo === cpoKey && String(loc.id) === String(stationId)) {
+      for (var j = 0; j < loc.connectors.length; j++) {
+        if (String(loc.connectors[j].id) === connectorId) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function setStatus(msg, isError) {

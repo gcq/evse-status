@@ -488,6 +488,12 @@ h1 {
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.discover-station.map-hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .discover-station-header {
@@ -561,6 +567,8 @@ h1 {
 }
 
 .discover-connector:last-child { border-bottom: none; }
+
+.discover-connector-added { opacity: 0.6; }
 
 .discover-connector-info {
   display: flex;
