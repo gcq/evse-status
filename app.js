@@ -76,14 +76,13 @@ function computeLimits(connector, rules, capabilities) {
 }
 
 function renderLimitBadge(limit) {
-  var remaining = limit.deadline - Date.now();
-  if (remaining <= 0) {
-    var overdueMins = Math.floor(-remaining / 60000);
-    var overdueHours = Math.floor(overdueMins / 60);
-    overdueMins = overdueMins % 60;
-    var overdueText = overdueHours > 0
-      ? "Should have left " + overdueHours + "h " + (overdueMins < 10 ? "0" : "") + overdueMins + "m ago"
-      : "Should have left " + overdueMins + "m ago";
+  if (limit.type === "mustLeaveWhenNotCharging") {
+    // deadline is a fixed sentinel (0) meaning "always immediately due" —
+    // it's not a real point in time, so it must never be fed through the
+    // elapsed-since-deadline math below (that measures time since the Unix
+    // epoch, ~56 years, and used to render as e.g. "Should have left
+    // 495356h 42m ago" once the overdue text started showing computed
+    // durations instead of a fixed "MUST LEAVE" string).
     var lines = [];
     if (limit.sessionUserName) lines.push(limit.sessionUserName);
     if (limit.sessionMinutes != null) {
@@ -94,9 +93,20 @@ function renderLimitBadge(limit) {
       lines.push(timeStr + kwh);
     }
     return '<div class="limit-badge-wrap">' +
-      '<span class="limit-badge limit-overdue">' + overdueText + '</span>' +
+      '<span class="limit-badge limit-overdue">Should leave now</span>' +
       lines.map(function(l) { return '<span class="limit-detail">' + l + '</span>'; }).join("") +
     '</div>';
+  }
+
+  var remaining = limit.deadline - Date.now();
+  if (remaining <= 0) {
+    var overdueMins = Math.floor(-remaining / 60000);
+    var overdueHours = Math.floor(overdueMins / 60);
+    overdueMins = overdueMins % 60;
+    var overdueText = overdueHours > 0
+      ? "Should have left " + overdueHours + "h " + (overdueMins < 10 ? "0" : "") + overdueMins + "m ago"
+      : "Should have left " + overdueMins + "m ago";
+    return '<span class="limit-badge limit-overdue">' + overdueText + '</span>';
   }
   var mins = Math.floor(remaining / 60000);
   var hours = Math.floor(mins / 60);
