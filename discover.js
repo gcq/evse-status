@@ -100,8 +100,14 @@ function geolocate() {
         });
       });
       map.setView([lat, lon], 14);
+      // Distinct from every charger-marker state (all solid dark/blue/amber
+      // fills with a white ring): a soft halo behind an inverted white-fill,
+      // blue-ring dot, so "you" never reads as just another highlighted pin.
       L.circleMarker([lat, lon], {
-        radius: 9, fillColor: "#3b82f6", color: "#fff", weight: 3, fillOpacity: 1
+        radius: 7, fillColor: "#e82127", stroke: false, fillOpacity: 0.18
+      }).addTo(map);
+      L.circleMarker([lat, lon], {
+        radius: 3, fillColor: "#fff", color: "#e82127", weight: 2, fillOpacity: 1
       }).addTo(map).bindPopup("You are here");
     },
     function(err) {
