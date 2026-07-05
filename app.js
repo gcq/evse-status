@@ -294,6 +294,29 @@ function renderCardSkeleton(loc) {
   '</div>';
 }
 
+function activeConnectors(location) {
+  return location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
+}
+
+// Shared body for every non-error card variant (main list, hidden section,
+// out-of-range section, out-of-service section) — they differ only in which
+// connectors they show and what buttons sit in the header.
+function renderCardBody(location, index, connectors, headerButtonsHtml, extraClass) {
+  var adapter = getAdapter(location.cpoKey) || {};
+  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
+  var connectorsHtml = connectors.map(function(c) { return renderConnector(c, context); }).join('');
+
+  return '<div class="card' + (extraClass ? ' ' + extraClass : '') + '">' +
+    '<div class="card-header">' +
+      headerButtonsHtml +
+      '<span class="location-name">' + location.displayName + '</span>' +
+      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
+    '</div>' +
+    renderAddressLine(location, index) +
+    '<div class="connectors">' + connectorsHtml + '</div>' +
+  '</div>';
+}
+
 function renderCard(location, index) {
   if (location.error) {
     return '<div class="card card-error">' +
@@ -305,12 +328,8 @@ function renderCard(location, index) {
   if (index != null && window.LOCATIONS[index] && window.LOCATIONS[index].hidden) return '';
   if (index != null && isOutOfRange(index)) return '';
 
-  var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
+  var active = activeConnectors(location);
   if (active.length === 0) return '';
-
-  var adapter = getAdapter(location.cpoKey) || {};
-  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
-  var connectorsHtml = active.map(function(c) { return renderConnector(c, context); }).join('');
 
   var refreshIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>';
   var refreshBtn = index != null
@@ -328,17 +347,7 @@ function renderCard(location, index) {
     ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="Hide this location">' + eyeIcon + '</button>'
     : '';
 
-  return '<div class="card">' +
-    '<div class="card-header">' +
-      refreshBtn +
-      autoBtn +
-      hideBtn +
-      '<span class="location-name">' + location.displayName + '</span>' +
-      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
-    '</div>' +
-    renderAddressLine(location, index) +
-    '<div class="connectors">' + connectorsHtml + '</div>' +
-  '</div>';
+  return renderCardBody(location, index, active, refreshBtn + autoBtn + hideBtn);
 }
 
 function renderAddressLine(location, index) {
@@ -367,22 +376,10 @@ function tickLastUpdatedTexts() {
 }
 
 function renderHiddenCard(location, index) {
-  var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
-  var adapter = getAdapter(location.cpoKey) || {};
-  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
-  var connectorsHtml = active.map(function(c) { return renderConnector(c, context); }).join('');
-
   var closedEyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+  var unhideBtn = '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location">' + closedEyeIcon + '</button>';
 
-  return '<div class="card">' +
-    '<div class="card-header">' +
-      '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location">' + closedEyeIcon + '</button>' +
-      '<span class="location-name">' + location.displayName + '</span>' +
-      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
-    '</div>' +
-    renderAddressLine(location, index) +
-    '<div class="connectors">' + connectorsHtml + '</div>' +
-  '</div>';
+  return renderCardBody(location, index, activeConnectors(location), unhideBtn);
 }
 
 function renderHiddenSection() {
@@ -453,19 +450,7 @@ function reorderCardsByDistance() {
 }
 
 function renderOutOfRangeCard(location, index) {
-  var active = location.connectors.filter(function(c) { return c.status !== "OUT_OF_SERVICE"; });
-  var adapter = getAdapter(location.cpoKey) || {};
-  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
-  var connectorsHtml = active.map(function(c) { return renderConnector(c, context); }).join('');
-
-  return '<div class="card">' +
-    '<div class="card-header">' +
-      '<span class="location-name">' + location.displayName + '</span>' +
-      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
-    '</div>' +
-    renderAddressLine(location, index) +
-    '<div class="connectors">' + connectorsHtml + '</div>' +
-  '</div>';
+  return renderCardBody(location, index, activeConnectors(location), '');
 }
 
 function renderOutOfRangeSection() {
@@ -492,19 +477,8 @@ function applyDistanceLayout() {
 }
 
 function renderOosCard(location, index) {
-  var adapter = getAdapter(location.cpoKey) || {};
-  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
   var oos = location.connectors.filter(function(c) { return c.status === "OUT_OF_SERVICE"; });
-  var connectorsHtml = oos.map(function(c) { return renderConnector(c, context); }).join('');
-
-  return '<div class="card card-oos">' +
-    '<div class="card-header">' +
-      '<span class="location-name">' + location.displayName + '</span>' +
-      '<span class="cpo-badge">' + (location.cpo || "Unknown") + '</span>' +
-    '</div>' +
-    renderAddressLine(location, index) +
-    '<div class="connectors">' + connectorsHtml + '</div>' +
-  '</div>';
+  return renderCardBody(location, index, oos, '', 'card-oos');
 }
 
 function renderOosSection() {
