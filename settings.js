@@ -171,11 +171,11 @@ function buildLocation(loc, li) {
     '<div class="s-field-row">' +
       '<div class="s-field">' +
         field("loc-" + li + "-lat", "Latitude",
-          input("loc-" + li + "-lat", loc.lat != null ? loc.lat : "", { type: "number", step: "any", placeholder: "e.g. 41.4036" })) +
+          input("loc-" + li + "-lat", loc.lat != null ? loc.lat : "", { type: "number", step: "any", placeholder: "e.g. 41.4036", readonly: true })) +
       '</div>' +
       '<div class="s-field">' +
         field("loc-" + li + "-lon", "Longitude",
-          input("loc-" + li + "-lon", loc.lon != null ? loc.lon : "", { type: "number", step: "any", placeholder: "e.g. 2.1744" })) +
+          input("loc-" + li + "-lon", loc.lon != null ? loc.lon : "", { type: "number", step: "any", placeholder: "e.g. 2.1744", readonly: true })) +
       '</div>' +
     '</div>' +
 
