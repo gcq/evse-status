@@ -164,7 +164,8 @@ function buildLocation(loc, li) {
       '</div>' +
       '<div class="s-field">' +
         field("loc-" + li + "-id", "Location ID",
-          input("loc-" + li + "-id", loc.id, { placeholder: "e.g. 42479", readonly: true })) +
+          input("loc-" + li + "-id", loc.id, { placeholder: "e.g. 42479", readonly: true }),
+          mergedChargerHint(loc)) +
       '</div>' +
     '</div>' +
 
@@ -253,9 +254,10 @@ function buildConnectors(loc, li) {
 }
 
 function buildConnector(conn, li, ci) {
+  var chargerBadge = conn.chargerId ? " (charger " + esc(conn.chargerId) + ")" : "";
   return '<div class="s-conn-row conn-row" data-li="' + li + '" data-ci="' + ci + '">' +
     '<div class="s-field">' +
-      '<label class="s-label">Connector ID</label>' +
+      '<label class="s-label">Connector ID' + chargerBadge + '</label>' +
       input("loc-" + li + "-conn-" + ci + "-id", conn.id, { placeholder: "e.g. 114172", readonly: true }) +
       '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-id"></span>' +
     '</div>' +
@@ -266,6 +268,27 @@ function buildConnector(conn, li, ci) {
     '</div>' +
     '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '">×</button>' +
   '</div>';
+}
+
+// TODO(hierarchy): loc.id is really a Charger/ChargePoint id, not a true
+// Location/site id — a location only spans multiple chargers when some of
+// its connectors carry a chargerId that differs from loc.id (set by
+// discover.js's pinSelected() when merging chargers at one evcharge site).
+// This is derived on the fly rather than stored, so it can never drift out
+// of sync with the connectors array (e.g. removing a sibling's connectors
+// here automatically "unmerges" it — see app.js's fetchLocation).
+function mergedChargerIds(loc) {
+  var extra = {};
+  loc.connectors.forEach(function(c) {
+    if (c.chargerId && c.chargerId !== loc.id) extra[c.chargerId] = true;
+  });
+  return Object.keys(extra);
+}
+
+function mergedChargerHint(loc) {
+  var extraIds = mergedChargerIds(loc);
+  if (extraIds.length === 0) return undefined;
+  return "Also covers charger" + (extraIds.length > 1 ? "s" : "") + " " + extraIds.join(", ");
 }
 
 function systemThemeHint() {
@@ -413,12 +436,20 @@ function collectIntoState() {
     }
     loc.rules = Object.keys(rules).length > 0 ? rules : null;
 
+    // Snapshot before resetting — loc IS state.locations[li] (same
+    // reference), so `loc.connectors = []` below would otherwise wipe out
+    // chargerId before we get a chance to carry it forward. chargerId isn't
+    // user-editable (no form field for it), so this is the only way to
+    // preserve it through a save.
+    var prevConnectors = loc.connectors || [];
     loc.connectors = [];
     card.querySelectorAll(".conn-row").forEach(function(row, ci) {
-      loc.connectors.push({
+      var newConn = {
         id:          card.querySelector('[data-fid="loc-' + li + '-conn-' + ci + '-id"]').value,
         displayName: card.querySelector('[data-fid="loc-' + li + '-conn-' + ci + '-name"]').value
-      });
+      };
+      if (prevConnectors[ci] && prevConnectors[ci].chargerId) newConn.chargerId = prevConnectors[ci].chargerId;
+      loc.connectors.push(newConn);
     });
   });
 }

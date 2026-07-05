@@ -121,40 +121,109 @@ function getAdapter(cpo) {
   return window.ADAPTERS && window.ADAPTERS[cpo];
 }
 
+function uniq(arr) {
+  var seen = {};
+  var out = [];
+  arr.forEach(function(v) { if (!seen[v]) { seen[v] = true; out.push(v); } });
+  return out;
+}
+
+// TODO(hierarchy): the real model is Location (site) -> Charger/ChargePoint
+// (one physical cabinet, `id`/`chargerId` below) -> Connector. `locConfig.id`
+// is really a Charger id, not a Location id — a location entry only spans
+// multiple chargers when its connectors' `chargerId` fields say so (set by
+// discover.js's pinSelected() when merging chargers at one evcharge site).
+// No distinct EVSE level is modeled between Charger and Connector anywhere
+// in this app.
 async function fetchLocation(locConfig) {
   var adapter = getAdapter(locConfig.cpo);
   if (!adapter) throw new Error("No adapter for CPO: " + locConfig.cpo);
 
-  var data = await adapter.fetchLocation(
-    locConfig.id,
-    locConfig.connectors.map(function(c) { return c.id; })
-  );
+  var displayNameMap = {};
+  locConfig.connectors.forEach(function(c) { displayNameMap[c.id] = c.displayName; });
 
-  // TODO(remove): migration shim only, for locations pinned before lat/lon
-  // was captured at pin time (discover.js's pinSelected() now sets it
-  // directly). Safe to delete once existing users' configs have all been
-  // backfilled once — new locations never need this.
-  if ((locConfig.lat == null || locConfig.lon == null) && data.lat != null && data.lon != null) {
-    locConfig.lat = data.lat;
-    locConfig.lon = data.lon;
+  var chargerIds = uniq(locConfig.connectors.map(function(c) { return c.chargerId || locConfig.id; }));
+  if (chargerIds.indexOf(locConfig.id) < 0) chargerIds.push(locConfig.id);
+
+  if (chargerIds.length === 1) {
+    // ── Single-charger location: today's exact behavior, unchanged. ────────
+    var data = await adapter.fetchLocation(
+      locConfig.id,
+      locConfig.connectors.map(function(c) { return c.id; })
+    );
+
+    // TODO(remove): migration shim only, for locations pinned before lat/lon
+    // was captured at pin time (discover.js's pinSelected() now sets it
+    // directly). Safe to delete once existing users' configs have all been
+    // backfilled once — new locations never need this.
+    if ((locConfig.lat == null || locConfig.lon == null) && data.lat != null && data.lon != null) {
+      locConfig.lat = data.lat;
+      locConfig.lon = data.lon;
+      persistLocations();
+      if (currentPosition) computeDistances();
+    }
+
+    return {
+      displayName: locConfig.displayName,
+      id: data.id,
+      cpoKey: locConfig.cpo,
+      cpo: data.cpo,
+      address: data.address,
+      realtime: data.realtime,
+      updatedAt: data.updatedAt,
+      rules: locConfig.rules || null,
+      error: null,
+      connectors: data.connectors.map(function(c) {
+        return Object.assign({}, c, {
+          displayName: displayNameMap[c.id] || c.visualRef || c.id
+        });
+      })
+    };
+  }
+
+  // ── Merged site: fetch every underlying charger, combine connectors. ────
+  var settled = await Promise.allSettled(chargerIds.map(function(cid) {
+    var wanted = locConfig.connectors
+      .filter(function(c) { return (c.chargerId || locConfig.id) === cid; })
+      .map(function(c) { return c.id; });
+    return adapter.fetchLocation(cid, wanted);
+  }));
+
+  var primaryIdx = chargerIds.indexOf(locConfig.id);
+  var primaryResult = settled[primaryIdx];
+  if (primaryResult.status === "rejected") {
+    // Primary charger failing fails the whole card, same as the
+    // single-charger path above.
+    throw primaryResult.reason;
+  }
+  var primaryData = primaryResult.value;
+
+  if ((locConfig.lat == null || locConfig.lon == null) && primaryData.lat != null && primaryData.lon != null) {
+    locConfig.lat = primaryData.lat;
+    locConfig.lon = primaryData.lon;
     persistLocations();
     if (currentPosition) computeDistances();
   }
 
-  var displayNameMap = {};
-  locConfig.connectors.forEach(function(c) { displayNameMap[c.id] = c.displayName; });
+  var mergedConnectors = [];
+  var anySiblingFailed = false;
+  settled.forEach(function(r) {
+    if (r.status === "rejected") { anySiblingFailed = true; return; }
+    r.value.connectors.forEach(function(c) { mergedConnectors.push(c); });
+  });
 
   return {
     displayName: locConfig.displayName,
-    id: data.id,
+    id: primaryData.id,
     cpoKey: locConfig.cpo,
-    cpo: data.cpo,
-    address: data.address,
-    realtime: data.realtime,
-    updatedAt: data.updatedAt,
+    cpo: primaryData.cpo,
+    address: primaryData.address,
+    realtime: primaryData.realtime,
+    updatedAt: primaryData.updatedAt,
     rules: locConfig.rules || null,
     error: null,
-    connectors: data.connectors.map(function(c) {
+    warning: anySiblingFailed ? "Some connectors may be unavailable right now" : null,
+    connectors: mergedConnectors.map(function(c) {
       return Object.assign({}, c, {
         displayName: displayNameMap[c.id] || c.visualRef || c.id
       });
@@ -272,6 +341,10 @@ function renderAddressLine(location, index) {
     parts.push('Updated <span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
       formatRelativeTime(lastUpdated) + '</span>');
   }
+  // Soft signal for a merged multi-charger location where one sibling
+  // charger's fetch failed but others succeeded — not the hard red
+  // card-error state, since most of the location is still showing live data.
+  if (location.warning) parts.push('<span class="location-warning">' + location.warning + '</span>');
   return parts.length ? '<div class="location-address">' + parts.join(" · ") + '</div>' : '';
 }
 

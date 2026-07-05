@@ -651,6 +651,10 @@ body.left-handed .card-header .location-name        { text-align: right; }
   padding: 0 20px 12px;
 }
 
+.location-warning {
+  color: var(--orange);
+}
+
 .card-error-msg {
   padding: 16px 20px;
   color: var(--red);

@@ -70,7 +70,26 @@ ADAPTERS.evcharge = {
           address: null,
           lat: cLat,
           lon: cLon,
-          distanceM: dist
+          distanceM: dist,
+          // Exact match across every charger/ChargePoint at the same physical
+          // site (confirmed live: e.g. id_charger 10511 & 10512 share this
+          // pair) — from the RAW strings, not the parsed cLat/cLon above, so
+          // equality is exact rather than incidentally relying on parseFloat
+          // determinism. Lets discover.js group multiple chargers into one
+          // Location card. See TODO(hierarchy) in app.js's fetchLocation.
+          //
+          // TODO(hierarchy): this exact-string match misses real-world
+          // duplicates when the provider itself never assigned a shared site
+          // anchor — confirmed live with id_charger 5671 vs 2067, same
+          // address/city/postal code (Sant Vicenç dels Horts, Carrer
+          // Claverol 6) but different location_latitude/location_longitude
+          // (41.38820545,2.00799539 vs 41.3881885,2.0079744 — ~2m apart) AND
+          // different location_id (322433 vs 293923) — i.e. the provider's
+          // own backend has two undeduplicated location records for one
+          // physical site. A distance-tolerance match (e.g. merge under
+          // ~5-10m) would catch this at the cost of some false-positive-merge
+          // risk for genuinely distinct nearby chargers; not implemented.
+          siteKey: ch.location_latitude + "," + ch.location_longitude
         };
       })
       .filter(function(s) {
