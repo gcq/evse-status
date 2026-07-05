@@ -27,12 +27,6 @@ function defaultConfig() {
 
 // ── HTML helpers ──────────────────────────────────────────────────────────
 
-function esc(s) {
-  return String(s == null ? "" : s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 function field(id, label, inputHtml, hint) {
   return '<div class="s-field">' +
     '<label class="s-label">' + label + '</label>' +

@@ -385,10 +385,6 @@ function setLocationHidden(i, value) {
   renderOutOfRangeSection();
 }
 
-function formatDistance(m) {
-  return m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(1) + " km";
-}
-
 function isOutOfRange(i) {
   return locationDistances[i] != null && !!maxDistanceKm && locationDistances[i] > maxDistanceKm * 1000;
 }

@@ -22,12 +22,6 @@ var MARKER_DEFAULT = { radius: 7, fillColor: "#1e293b", color: "#3b82f6", weight
 var MARKER_HOVER   = { radius: 9, fillColor: "#3b82f6", color: "#fff",    weight: 3, fillOpacity: 1 };
 var MARKER_OPEN    = { radius: 9, fillColor: "#f59e0b", color: "#fff",    weight: 3, fillOpacity: 1 };
 
-function esc(s) {
-  return String(s == null ? "" : s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -246,16 +240,12 @@ function renderStationGroup(g, gi) {
       '<div class="discover-station-aside">' +
         countBadge +
         '<span class="cpo-badge">' + esc(g.cpoKey) + '</span>' +
-        '<span class="dist-chip">' + formatDist(g.distanceM) + '</span>' +
+        '<span class="dist-chip">' + formatDistance(g.distanceM) + '</span>' +
         '<span class="discover-chevron">›</span>' +
       '</div>' +
     '</div>' +
     '<div class="discover-connectors" id="dc-' + gi + '"></div>' +
   '</div>';
-}
-
-function formatDist(m) {
-  return m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(1) + " km";
 }
 
 // ── Expand station ────────────────────────────────────────────────────────
