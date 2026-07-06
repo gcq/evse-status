@@ -150,17 +150,22 @@ function buildLocation(loc, li) {
 
   var leftCol =
     '<div class="s-field-row">' +
-      field("loc-" + li + "-displayName", "Display name",
-        input("loc-" + li + "-displayName", loc.displayName, { placeholder: "e.g. Moli" })) +
+      '<div class="s-field s-field-inline">' +
+        '<div class="s-field-inline-row">' +
+          '<label class="s-label">Name</label>' +
+          input("loc-" + li + "-displayName", loc.displayName, { placeholder: "e.g. Moli" }) +
+        '</div>' +
+        '<span class="s-error" data-err="loc-' + li + '-displayName"></span>' +
+      '</div>' +
       '<label class="s-rule-label s-inline-toggle">' +
         '<input class="s-checkbox loc-hidden-toggle" type="checkbox" data-li="' + li + '"' + (loc.hidden ? " checked" : "") + '> ' +
-        'Hidden from main list' +
+        'Hidden' +
       '</label>' +
     '</div>' +
 
     '<div class="s-field-row">' +
       staticField("CPO", cpoLabel(loc.cpo)) +
-      staticField("Location ID", loc.id, { hint: mergedChargerHint(loc), errId: "loc-" + li + "-id" }) +
+      staticField("Location ID", loc.id, { hint: mergedChargerHint(loc) }) +
       staticField("Coordinates", coords) +
     '</div>' +
 
@@ -236,7 +241,7 @@ function buildConnectors(loc, li) {
 function buildConnector(conn, li, ci) {
   var chargerBadge = conn.chargerId ? " (charger " + esc(conn.chargerId) + ")" : "";
   return '<div class="s-conn-row conn-row" data-li="' + li + '" data-ci="' + ci + '">' +
-    staticField("ID" + chargerBadge, conn.id, { errId: "loc-" + li + "-conn-" + ci + "-id" }) +
+    staticField("ID" + chargerBadge, conn.id) +
     '<div class="s-field s-field-inline">' +
       '<div class="s-field-inline-row">' +
         '<label class="s-label">Name</label>' +
@@ -429,6 +434,9 @@ function collectIntoState() {
 function validate(cfg) {
   var errors = {};
 
+  if (cfg.maxDistanceKm != null && cfg.maxDistanceKm < 0)
+    errors["g-max-distance"] = "Must be 0 or greater";
+
   if (cfg.locations.length === 0) {
     errors["no-locations"] = "At least one location is required";
     return errors;
@@ -437,15 +445,11 @@ function validate(cfg) {
   cfg.locations.forEach(function(loc, li) {
     if (!loc.displayName.trim())
       errors["loc-" + li + "-displayName"] = "Required";
-    if (!loc.id.trim())
-      errors["loc-" + li + "-id"] = "Required";
 
     if (loc.connectors.length === 0)
       errors["loc-" + li + "-connectors"] = "At least one connector required";
 
     loc.connectors.forEach(function(conn, ci) {
-      if (!conn.id.trim())
-        errors["loc-" + li + "-conn-" + ci + "-id"] = "Required";
       if (!conn.displayName.trim())
         errors["loc-" + li + "-conn-" + ci + "-name"] = "Required";
     });

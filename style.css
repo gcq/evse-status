@@ -237,13 +237,12 @@ h1 {
   margin-bottom: 12px;
 }
 
-.s-conn-row .s-field-inline,
-.s-conn-row .s-static {
+.s-field-inline {
   position: relative;
+  margin-bottom: 0;
 }
 
-.s-conn-row .s-field-inline .s-error,
-.s-conn-row .s-static .s-error {
+.s-field-inline .s-error {
   position: absolute;
   top: 100%;
   left: 0;
@@ -273,6 +272,10 @@ h1 {
   gap: 12px;
 }
 
+.s-field-row + .s-field-row {
+  margin-top: 12px;
+}
+
 .s-field-row > .s-field {
   flex: 1 1 160px;
   min-width: 160px;
@@ -292,7 +295,6 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 12px;
 }
 
 .s-static-row {
@@ -474,7 +476,6 @@ h1 {
 .s-conn-row .s-static {
   flex: 0 1 auto;
   min-width: 0;
-  margin-bottom: 0;
 }
 
 .settings-actions {
