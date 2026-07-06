@@ -17,6 +17,10 @@ var MARKER_OPEN    = { radius: 9, fillColor: "#f59e0b", color: "#fff",    weight
 // ── Init ──────────────────────────────────────────────────────────────────
 
 document.addEventListener("DOMContentLoaded", function() {
+  var cfg = getConfig();
+  document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "auto");
+  if (cfg && cfg.handedness === "left") document.body.classList.add("left-handed");
+
   existingLocations = loadExistingLocations();
 
   map = L.map("map").setView([41.4, 2.17], 13);
