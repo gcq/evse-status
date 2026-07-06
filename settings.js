@@ -19,18 +19,6 @@ function loadConfig() {
   return getConfig() || defaultConfig();
 }
 
-function defaultConfig() {
-  return {
-    handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
-    theme: "auto",
-    locationOrder: "config",
-    maxDistanceKm: null,
-    locations: (typeof LOCATIONS !== "undefined")
-      ? JSON.parse(JSON.stringify(LOCATIONS))
-      : []
-  };
-}
-
 // ── HTML helpers ──────────────────────────────────────────────────────────
 
 function field(id, label, inputHtml, hint) {

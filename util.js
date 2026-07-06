@@ -17,6 +17,18 @@ function setConfig(cfg) {
   localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
 }
 
+function defaultConfig() {
+  return {
+    handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
+    theme: "auto",
+    locationOrder: "config",
+    maxDistanceKm: null,
+    locations: (typeof LOCATIONS !== "undefined")
+      ? JSON.parse(JSON.stringify(LOCATIONS))
+      : []
+  };
+}
+
 function haversineM(lat1, lon1, lat2, lon2) {
   var R = 6371000;
   var phi1 = lat1 * Math.PI / 180, phi2 = lat2 * Math.PI / 180;

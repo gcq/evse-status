@@ -373,13 +373,7 @@ function updateAddButton() {
 function pinSelected() {
   if (pendingPins.length === 0) return;
 
-  var cfg = getConfig();
-  if (!cfg) {
-    cfg = {
-      handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
-      locations: (typeof LOCATIONS !== "undefined") ? JSON.parse(JSON.stringify(LOCATIONS)) : []
-    };
-  }
+  var cfg = getConfig() || defaultConfig();
 
   // Group pins by site, not by individual charger — multiple pins from
   // different chargers at the same site must collapse into ONE Location
