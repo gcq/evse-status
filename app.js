@@ -650,6 +650,13 @@ async function refresh() {
   setLoading(true);
   snapCountdownToZero();
 
+  if (LOCATIONS.length === 0) {
+    document.getElementById("cards").innerHTML =
+      '<p class="s-hint" style="text-align:center;padding:32px">No locations configured — add one in Settings</p>';
+    setLoading(false);
+    return;
+  }
+
   var container = document.getElementById("cards");
   var isFirstLoad = !document.getElementById("card-slot-0");
 
