@@ -705,7 +705,7 @@ document.addEventListener("DOMContentLoaded", function() {
     document.body.classList.add("left-handed");
   }
 
-  document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "light");
+  document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "auto");
 
   updateRefreshUI();
 

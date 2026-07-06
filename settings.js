@@ -19,7 +19,7 @@ function loadConfig() {
 function defaultConfig() {
   return {
     handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
-    theme: "light",
+    theme: "auto",
     locationOrder: "config",
     maxDistanceKm: null,
     locations: (typeof LOCATIONS !== "undefined")
@@ -78,7 +78,7 @@ function hasCapability(cpo, cap) {
 
 function render() {
   document.body.classList.toggle("left-handed", state.handedness === "left");
-  document.body.setAttribute("data-theme", state.theme || "light");
+  document.body.setAttribute("data-theme", state.theme || "auto");
   document.getElementById("form-root").innerHTML = buildGlobal() + buildLocations();
   bindFormEvents();
 }

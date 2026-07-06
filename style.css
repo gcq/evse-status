@@ -24,7 +24,7 @@
 }
 
 /* Keep this block and the prefers-color-scheme:light block below in sync. */
-body[data-theme="light"] {
+[data-theme="light"] {
   --bg: #FFFFFF;
   --surface: #F4F4F4;
   --border: #D0D1D2;
@@ -47,9 +47,9 @@ body[data-theme="light"] {
   --reserved-fg: #5b21b6;
 }
 
-/* Keep this block and the body[data-theme="light"] block above in sync. */
+/* Keep this block and the [data-theme="light"] block above in sync. */
 @media (prefers-color-scheme: light) {
-  body[data-theme="auto"] {
+  [data-theme="auto"] {
     --bg: #FFFFFF;
     --surface: #F4F4F4;
     --border: #D0D1D2;

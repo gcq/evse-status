@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EVSE Status</title>
   <link rel="stylesheet" href="style.css">
+  <script>
+    try {
+      var t = (JSON.parse(localStorage.getItem("evse_config")) || {}).theme;
+      document.documentElement.setAttribute("data-theme", t || "auto");
+    } catch (e) { document.documentElement.setAttribute("data-theme", "auto"); }
+  </script>
 </head>
 <body>
   <header>

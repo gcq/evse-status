@@ -6,6 +6,12 @@
   <title>Discover Chargers</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script>
+    try {
+      var t = (JSON.parse(localStorage.getItem("evse_config")) || {}).theme;
+      document.documentElement.setAttribute("data-theme", t || "auto");
+    } catch (e) { document.documentElement.setAttribute("data-theme", "auto"); }
+  </script>
 </head>
 <body>
   <header>
