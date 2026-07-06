@@ -152,7 +152,8 @@ h1 {
 .btn-danger    { background: var(--red-bg); color: var(--red); border-color: var(--red-bg); }
 .btn-icon      { padding: 0; min-width: 44px; font-size: 20px; }
 
-.auto-refresh-loc-btn.active {
+.auto-refresh-loc-btn.active,
+.loc-hidden-toggle-btn.active {
   color: var(--accent);
   border-color: var(--accent);
 }
@@ -283,12 +284,6 @@ h1 {
 
 .s-field-row > .s-static {
   flex: 0 0 auto;
-}
-
-.s-field-row > .s-inline-toggle {
-  flex: 0 0 auto;
-  min-width: 0;
-  align-self: center;
 }
 
 .s-static {

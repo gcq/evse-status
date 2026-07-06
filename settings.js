@@ -1,5 +1,8 @@
 var state = null;
 
+var eyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>';
+var closedEyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 
 function init() {
@@ -157,10 +160,9 @@ function buildLocation(loc, li) {
         '</div>' +
         '<span class="s-error" data-err="loc-' + li + '-displayName"></span>' +
       '</div>' +
-      '<label class="s-rule-label s-inline-toggle">' +
-        '<input class="s-checkbox loc-hidden-toggle" type="checkbox" data-li="' + li + '"' + (loc.hidden ? " checked" : "") + '> ' +
-        'Hidden' +
-      '</label>' +
+      '<button type="button" class="btn btn-ghost btn-icon loc-hidden-toggle-btn' + (loc.hidden ? " active" : "") + '" data-li="' + li + '" title="' + (loc.hidden ? "Show on main list" : "Hide from main list") + '">' +
+        (loc.hidden ? closedEyeIcon : eyeIcon) +
+      '</button>' +
     '</div>' +
 
     '<div class="s-field-row">' +
@@ -315,6 +317,15 @@ function bindFormEvents() {
     window.location.href = "discover.html";
   });
 
+  document.querySelectorAll(".loc-hidden-toggle-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      collectIntoState();
+      state.locations[li].hidden = !state.locations[li].hidden;
+      render();
+    });
+  });
+
   document.querySelectorAll(".remove-loc-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
       var li = +this.dataset.li;
@@ -387,9 +398,9 @@ function collectIntoState() {
     if (!loc) return;
 
     loc.displayName = card.querySelector('[data-fid="loc-' + li + '-displayName"]').value;
-    // cpo, id, lat, lon are read-only (no form field) — loc already holds
-    // the correct values since it's the same object reference as state.locations[li].
-    loc.hidden = card.querySelector(".loc-hidden-toggle").checked;
+    // cpo, id, lat, lon, hidden are read-only here (no form field) — loc
+    // already holds the correct values since it's the same object reference
+    // as state.locations[li]; hidden is toggled directly by its button.
 
     var rules = {};
 
