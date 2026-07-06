@@ -360,21 +360,27 @@ function renderHiddenCard(location, index) {
   return renderCardBody(location, index, activeConnectors(location), unhideBtn);
 }
 
-function renderHiddenSection() {
-  var el = document.getElementById("hidden-section");
+function renderCollapsedSection(elId, title, filterFn, renderItemFn) {
+  var el = document.getElementById(elId);
   if (!el) return;
-  var hiddenLocations = [];
+  var items = [];
   locationResults.forEach(function(r, i) {
-    if (r && !r.error && LOCATIONS[i] && LOCATIONS[i].hidden) hiddenLocations.push({ result: r, index: i });
+    if (r && !r.error && filterFn(r, i)) items.push({ result: r, index: i });
   });
-  if (hiddenLocations.length === 0) { el.innerHTML = ''; return; }
+  if (items.length === 0) { el.innerHTML = ''; return; }
   el.innerHTML =
     '<details class="oos-page-section">' +
-      '<summary class="oos-page-summary">Hidden (' + hiddenLocations.length + ')</summary>' +
+      '<summary class="oos-page-summary">' + title + ' (' + items.length + ')</summary>' +
       '<div class="oos-cards">' +
-        hiddenLocations.map(function(h) { return renderHiddenCard(h.result, h.index); }).join('') +
+        items.map(function(it) { return renderItemFn(it.result, it.index); }).join('') +
       '</div>' +
     '</details>';
+}
+
+function renderHiddenSection() {
+  renderCollapsedSection("hidden-section", "Hidden", function(r, i) {
+    return LOCATIONS[i] && LOCATIONS[i].hidden;
+  }, renderHiddenCard);
 }
 
 function rerenderCardSlot(i) {
@@ -428,20 +434,9 @@ function renderOutOfRangeCard(location, index) {
 }
 
 function renderOutOfRangeSection() {
-  var el = document.getElementById("out-of-range-section");
-  if (!el) return;
-  var items = [];
-  locationResults.forEach(function(r, i) {
-    if (r && !r.error && LOCATIONS[i] && !LOCATIONS[i].hidden && isOutOfRange(i)) items.push({ result: r, index: i });
-  });
-  if (items.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML =
-    '<details class="oos-page-section">' +
-      '<summary class="oos-page-summary">Out of range (' + items.length + ')</summary>' +
-      '<div class="oos-cards">' +
-        items.map(function(it) { return renderOutOfRangeCard(it.result, it.index); }).join('') +
-      '</div>' +
-    '</details>';
+  renderCollapsedSection("out-of-range-section", "Out of range", function(r, i) {
+    return LOCATIONS[i] && !LOCATIONS[i].hidden && isOutOfRange(i);
+  }, renderOutOfRangeCard);
 }
 
 function applyDistanceLayout() {
@@ -456,22 +451,9 @@ function renderOosCard(location, index) {
 }
 
 function renderOosSection() {
-  var el = document.getElementById("oos-section");
-  if (!el) return;
-  var oosLocations = [];
-  locationResults.forEach(function(r, i) {
-    if (r && !r.error && r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; })) {
-      oosLocations.push({ result: r, index: i });
-    }
-  });
-  if (oosLocations.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML =
-    '<details class="oos-page-section">' +
-      '<summary class="oos-page-summary">Out of service (' + oosLocations.length + ')</summary>' +
-      '<div class="oos-cards">' +
-        oosLocations.map(function(o) { return renderOosCard(o.result, o.index); }).join('') +
-      '</div>' +
-    '</details>';
+  renderCollapsedSection("oos-section", "Out of service", function(r) {
+    return r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; });
+  }, renderOosCard);
 }
 
 function setLoading(isLoading) {
