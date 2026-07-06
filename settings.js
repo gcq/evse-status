@@ -49,12 +49,20 @@ function input(id, value, opts) {
     '>';
 }
 
-function getCpoOptions(selected) {
-  var adapters = window.ADAPTERS || {};
-  return Object.keys(adapters).map(function(key) {
-    var label = key.charAt(0).toUpperCase() + key.slice(1);
-    return '<option value="' + esc(key) + '"' + (key === selected ? " selected" : "") + '>' + esc(label) + '</option>';
-  }).join("");
+function staticField(label, value, opts) {
+  opts = opts || {};
+  return '<div class="s-static">' +
+    '<div class="s-static-row">' +
+      '<span class="s-static-label">' + label + '</span>' +
+      '<span class="s-static-value">' + esc(value) + '</span>' +
+    '</div>' +
+    (opts.hint ? '<span class="s-hint">' + esc(opts.hint) + '</span>' : '') +
+    (opts.errId ? '<span class="s-error" data-err="' + opts.errId + '"></span>' : '') +
+  '</div>';
+}
+
+function cpoLabel(cpo) {
+  return cpo ? cpo.charAt(0).toUpperCase() + cpo.slice(1) : "";
 }
 
 function hasCapability(cpo, cap) {
@@ -100,8 +108,8 @@ function buildGlobal() {
       '<div class="s-field">' +
         '<label class="s-label">Driving side</label>' +
         segmentedControl("g-handedness", [
-          { value: "right", label: "Right" },
-          { value: "left",  label: "Left" }
+          { value: "left",  label: "Left" },
+          { value: "right", label: "Right" }
         ], state.handedness || "right") +
         '<span class="s-hint">Controls move to the opposite side, near your hand</span>' +
       '</div>' +
@@ -139,40 +147,23 @@ function buildLocation(loc, li) {
   var notChargingCapWarning = !hasCapability(loc.cpo, "CONNECTED_NOT_CHARGING")
     ? '<span class="s-cap-warn">not supported by ' + esc(loc.cpo) + '</span>' : "";
 
+  var coords = (loc.lat != null && loc.lon != null) ? (loc.lat.toFixed(5) + ", " + loc.lon.toFixed(5)) : "—";
+
   var leftCol =
-    field("loc-" + li + "-displayName", "Display name",
-      input("loc-" + li + "-displayName", loc.displayName, { placeholder: "e.g. Moli" })) +
-
     '<div class="s-field-row">' +
-      '<div class="s-field">' +
-        '<label class="s-label">CPO</label>' +
-        '<select class="s-input s-select" data-fid="loc-' + li + '-cpo" disabled>' +
-          getCpoOptions(loc.cpo) +
-        '</select>' +
-        '<span class="s-error" data-err="loc-' + li + '-cpo"></span>' +
-      '</div>' +
-      '<div class="s-field">' +
-        field("loc-" + li + "-id", "Location ID",
-          input("loc-" + li + "-id", loc.id, { placeholder: "e.g. 42479", readonly: true }),
-          mergedChargerHint(loc)) +
-      '</div>' +
+      field("loc-" + li + "-displayName", "Display name",
+        input("loc-" + li + "-displayName", loc.displayName, { placeholder: "e.g. Moli" })) +
+      '<label class="s-rule-label s-inline-toggle">' +
+        '<input class="s-checkbox loc-hidden-toggle" type="checkbox" data-li="' + li + '"' + (loc.hidden ? " checked" : "") + '> ' +
+        'Hidden from main list' +
+      '</label>' +
     '</div>' +
 
     '<div class="s-field-row">' +
-      '<div class="s-field">' +
-        field("loc-" + li + "-lat", "Latitude",
-          input("loc-" + li + "-lat", loc.lat != null ? loc.lat : "", { type: "number", step: "any", placeholder: "e.g. 41.4036", readonly: true })) +
-      '</div>' +
-      '<div class="s-field">' +
-        field("loc-" + li + "-lon", "Longitude",
-          input("loc-" + li + "-lon", loc.lon != null ? loc.lon : "", { type: "number", step: "any", placeholder: "e.g. 2.1744", readonly: true })) +
-      '</div>' +
+      staticField("CPO", cpoLabel(loc.cpo)) +
+      staticField("Location ID", loc.id, { hint: mergedChargerHint(loc), errId: "loc-" + li + "-id" }) +
+      staticField("Coordinates", coords) +
     '</div>' +
-
-    '<label class="s-rule-label" style="margin:8px 0;display:block">' +
-      '<input class="s-checkbox loc-hidden-toggle" type="checkbox" data-li="' + li + '"' + (loc.hidden ? " checked" : "") + '> ' +
-      'Hidden from main list' +
-    '</label>' +
 
     '<h4 class="s-subsection-title">Rules</h4>' +
 
@@ -245,14 +236,12 @@ function buildConnectors(loc, li) {
 function buildConnector(conn, li, ci) {
   var chargerBadge = conn.chargerId ? " (charger " + esc(conn.chargerId) + ")" : "";
   return '<div class="s-conn-row conn-row" data-li="' + li + '" data-ci="' + ci + '">' +
-    '<div class="s-field">' +
-      '<label class="s-label">Connector ID' + chargerBadge + '</label>' +
-      input("loc-" + li + "-conn-" + ci + "-id", conn.id, { placeholder: "e.g. 114172", readonly: true }) +
-      '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-id"></span>' +
-    '</div>' +
-    '<div class="s-field">' +
-      '<label class="s-label">Display name</label>' +
-      input("loc-" + li + "-conn-" + ci + "-name", conn.displayName, { placeholder: "e.g. Charger 1 plug B" }) +
+    staticField("ID" + chargerBadge, conn.id, { errId: "loc-" + li + "-conn-" + ci + "-id" }) +
+    '<div class="s-field s-field-inline">' +
+      '<div class="s-field-inline-row">' +
+        '<label class="s-label">Name</label>' +
+        input("loc-" + li + "-conn-" + ci + "-name", conn.displayName, { placeholder: "e.g. Charger 1 plug B" }) +
+      '</div>' +
       '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-name"></span>' +
     '</div>' +
     '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '">×</button>' +
@@ -393,12 +382,8 @@ function collectIntoState() {
     if (!loc) return;
 
     loc.displayName = card.querySelector('[data-fid="loc-' + li + '-displayName"]').value;
-    loc.cpo = card.querySelector('[data-fid="loc-' + li + '-cpo"]').value;
-    loc.id = card.querySelector('[data-fid="loc-' + li + '-id"]').value;
-    var latVal = card.querySelector('[data-fid="loc-' + li + '-lat"]').value;
-    var lonVal = card.querySelector('[data-fid="loc-' + li + '-lon"]').value;
-    loc.lat = latVal.trim() !== "" && !isNaN(parseFloat(latVal)) ? parseFloat(latVal) : null;
-    loc.lon = lonVal.trim() !== "" && !isNaN(parseFloat(lonVal)) ? parseFloat(lonVal) : null;
+    // cpo, id, lat, lon are read-only (no form field) — loc already holds
+    // the correct values since it's the same object reference as state.locations[li].
     loc.hidden = card.querySelector(".loc-hidden-toggle").checked;
 
     var rules = {};
@@ -423,14 +408,14 @@ function collectIntoState() {
 
     // Snapshot before resetting — loc IS state.locations[li] (same
     // reference), so `loc.connectors = []` below would otherwise wipe out
-    // chargerId before we get a chance to carry it forward. chargerId isn't
-    // user-editable (no form field for it), so this is the only way to
-    // preserve it through a save.
+    // id/chargerId before we get a chance to carry them forward. Neither is
+    // user-editable (no form field for either), so this is the only way to
+    // preserve them through a save.
     var prevConnectors = loc.connectors || [];
     loc.connectors = [];
     card.querySelectorAll(".conn-row").forEach(function(row, ci) {
       var newConn = {
-        id:          card.querySelector('[data-fid="loc-' + li + '-conn-' + ci + '-id"]').value,
+        id:          prevConnectors[ci] ? prevConnectors[ci].id : "",
         displayName: card.querySelector('[data-fid="loc-' + li + '-conn-' + ci + '-name"]').value
       };
       if (prevConnectors[ci] && prevConnectors[ci].chargerId) newConn.chargerId = prevConnectors[ci].chargerId;

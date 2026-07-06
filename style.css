@@ -240,15 +240,68 @@ h1 {
   margin-bottom: 12px;
 }
 
+.s-field-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.s-field-inline-row .s-label {
+  flex: 0 0 auto;
+}
+
+.s-field-inline-row .s-input {
+  flex: 1 1 90px;
+  min-width: 90px;
+  width: auto;
+}
+
 .s-field-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: space-between;
   gap: 12px;
 }
 
 .s-field-row > .s-field {
   flex: 1 1 160px;
   min-width: 160px;
+}
+
+.s-field-row > .s-static {
+  flex: 0 0 auto;
+}
+
+.s-field-row > .s-inline-toggle {
+  flex: 0 0 auto;
+  min-width: 0;
+  align-self: center;
+}
+
+.s-static {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.s-static-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.s-static-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  flex: 0 0 auto;
+}
+
+.s-static-value {
+  font-size: 14px;
+  white-space: nowrap;
+  color: var(--text-primary);
 }
 
 .s-label {
@@ -401,7 +454,7 @@ h1 {
 .s-conn-row {
   display: flex;
   gap: 10px;
-  align-items: flex-end;
+  align-items: center;
   margin-bottom: 10px;
   padding: 12px;
   background: var(--surface);
@@ -411,7 +464,13 @@ h1 {
 
 .s-conn-row .s-field {
   flex: 1;
-  min-width: 120px;
+  min-width: 150px;
+  margin-bottom: 0;
+}
+
+.s-conn-row .s-static {
+  flex: 0 1 auto;
+  min-width: 0;
   margin-bottom: 0;
 }
 
@@ -457,10 +516,14 @@ h1 {
   display: flex;
 }
 
-/* settings page: stack on very narrow screens only */
-@media (max-width: 420px) {
+/* settings page: location/connectors columns get cramped below this width */
+@media (max-width: 800px) {
   .loc-columns { flex-direction: column; }
   .loc-col-connectors { border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 16px; }
+}
+
+/* settings page: stack on very narrow screens only */
+@media (max-width: 420px) {
   .settings-actions { flex-direction: column; }
   .settings-actions .btn { width: 100%; }
 }
