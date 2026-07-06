@@ -120,18 +120,6 @@ h1 {
 }
 
 
-#last-updated {
-  font-size: 14px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-#last-updated-time {
-  display: inline-block;
-  min-width: 11ch;
-  font-variant-numeric: tabular-nums;
-}
-
 .countdown-label {
   display: inline-block;
   font-size: 14px;
@@ -400,15 +388,6 @@ h1 {
 
 .s-segment:active {
   transform: scale(0.97);
-}
-
-.s-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2394a3b8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  padding-right: 36px;
-  cursor: pointer;
 }
 
 .s-input-narrow { max-width: 100px; }
