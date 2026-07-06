@@ -310,16 +310,16 @@ function renderCard(location, index) {
   if (active.length === 0) return '';
 
   var refreshBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '">' + ICONS.refresh + '</button>'
+    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '" title="Refresh this location" aria-label="Refresh this location">' + ICONS.refresh + '</button>'
     : '';
 
   var isAutoOnly = index != null && window.LOCATIONS[index] && window.LOCATIONS[index].autoRefresh;
   var autoBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="Auto-refresh only this location">' + ICONS.auto + '</button>'
+    ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="Auto-refresh only this location" aria-label="Auto-refresh only this location">' + ICONS.auto + '</button>'
     : '';
 
   var hideBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="Hide this location">' + ICONS.eye + '</button>'
+    ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="Hide this location" aria-label="Hide this location">' + ICONS.eye + '</button>'
     : '';
 
   return renderCardBody(location, index, active, refreshBtn + autoBtn + hideBtn);
@@ -351,7 +351,7 @@ function tickLastUpdatedTexts() {
 }
 
 function renderHiddenCard(location, index) {
-  var unhideBtn = '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location">' + ICONS.eyeOff + '</button>';
+  var unhideBtn = '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location" aria-label="Show this location">' + ICONS.eyeOff + '</button>';
 
   return renderCardBody(location, index, activeConnectors(location), unhideBtn);
 }

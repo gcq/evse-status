@@ -152,7 +152,7 @@ function buildLocation(loc, li) {
         '</div>' +
         '<span class="s-error" data-err="loc-' + li + '-displayName"></span>' +
       '</div>' +
-      '<button type="button" class="btn btn-ghost btn-icon loc-hidden-toggle-btn' + (loc.hidden ? " active" : "") + '" data-li="' + li + '" title="' + (loc.hidden ? "Show on main list" : "Hide from main list") + '">' +
+      '<button type="button" class="btn btn-ghost btn-icon loc-hidden-toggle-btn' + (loc.hidden ? " active" : "") + '" data-li="' + li + '" title="' + (loc.hidden ? "Show on main list" : "Hide from main list") + '" aria-label="' + (loc.hidden ? "Show on main list" : "Hide from main list") + '">' +
         (loc.hidden ? ICONS.eyeOff : ICONS.eye) +
       '</button>' +
     '</div>' +
@@ -213,8 +213,8 @@ function buildLocation(loc, li) {
   var total = state.locations.length;
   var footer =
     '<div class="s-card-footer">' +
-      '<button class="btn btn-ghost btn-icon move-up-btn" data-li="' + li + '" ' + (li === 0 ? 'disabled' : '') + '>↑</button>' +
-      '<button class="btn btn-ghost btn-icon move-down-btn" data-li="' + li + '" ' + (li === total - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button class="btn btn-ghost btn-icon move-up-btn" data-li="' + li + '" title="Move up" aria-label="Move up" ' + (li === 0 ? 'disabled' : '') + '>↑</button>' +
+      '<button class="btn btn-ghost btn-icon move-down-btn" data-li="' + li + '" title="Move down" aria-label="Move down" ' + (li === total - 1 ? 'disabled' : '') + '>↓</button>' +
       '<button class="btn btn-danger remove-loc-btn" data-li="' + li + '">Remove</button>' +
     '</div>';
 
@@ -249,10 +249,10 @@ function buildConnector(conn, li, ci, total) {
       '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-name"></span>' +
     '</div>' +
     '<div class="s-conn-move">' +
-      '<button type="button" class="btn btn-ghost btn-icon move-conn-up-btn" data-li="' + li + '" data-ci="' + ci + '" ' + (ci === 0 ? "disabled" : "") + '>↑</button>' +
-      '<button type="button" class="btn btn-ghost btn-icon move-conn-down-btn" data-li="' + li + '" data-ci="' + ci + '" ' + (ci === total - 1 ? "disabled" : "") + '>↓</button>' +
+      '<button type="button" class="btn btn-ghost btn-icon move-conn-up-btn" data-li="' + li + '" data-ci="' + ci + '" title="Move up" aria-label="Move up" ' + (ci === 0 ? "disabled" : "") + '>↑</button>' +
+      '<button type="button" class="btn btn-ghost btn-icon move-conn-down-btn" data-li="' + li + '" data-ci="' + ci + '" title="Move down" aria-label="Move down" ' + (ci === total - 1 ? "disabled" : "") + '>↓</button>' +
     '</div>' +
-    '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '">×</button>' +
+    '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '" title="Remove connector" aria-label="Remove connector">×</button>' +
   '</div>';
 }
 
