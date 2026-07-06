@@ -173,6 +173,8 @@ function buildLocation(loc, li) {
 
     '<h4 class="s-subsection-title">Rules</h4>' +
 
+    '<div class="s-rules">' +
+
     '<div class="s-rule-row' + (maxDur ? " enabled" : "") + '" data-rule="maxChargeDuration">' +
       '<label class="s-rule-label">' +
         '<input class="s-checkbox rule-toggle" type="checkbox"' + (maxDur ? " checked" : "") + '> ' +
@@ -208,7 +210,9 @@ function buildLocation(loc, li) {
           'Must leave when not charging' +
         '</label>' +
       '</div>'
-    : "");
+    : "") +
+
+    '</div>';
 
   var rightCol =
     buildConnectors(loc, li) +
@@ -235,12 +239,13 @@ function buildLocation(loc, li) {
 }
 
 function buildConnectors(loc, li) {
+  var total = loc.connectors.length;
   return loc.connectors.map(function(conn, ci) {
-    return buildConnector(conn, li, ci);
+    return buildConnector(conn, li, ci, total);
   }).join("");
 }
 
-function buildConnector(conn, li, ci) {
+function buildConnector(conn, li, ci, total) {
   var chargerBadge = conn.chargerId ? " (charger " + esc(conn.chargerId) + ")" : "";
   return '<div class="s-conn-row conn-row" data-li="' + li + '" data-ci="' + ci + '">' +
     staticField("ID" + chargerBadge, conn.id) +
@@ -250,6 +255,10 @@ function buildConnector(conn, li, ci) {
         input("loc-" + li + "-conn-" + ci + "-name", conn.displayName, { placeholder: "e.g. Charger 1 plug B" }) +
       '</div>' +
       '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-name"></span>' +
+    '</div>' +
+    '<div class="s-conn-move">' +
+      '<button type="button" class="btn btn-ghost btn-icon move-conn-up-btn" data-li="' + li + '" data-ci="' + ci + '" ' + (ci === 0 ? "disabled" : "") + '>↑</button>' +
+      '<button type="button" class="btn btn-ghost btn-icon move-conn-down-btn" data-li="' + li + '" data-ci="' + ci + '" ' + (ci === total - 1 ? "disabled" : "") + '>↓</button>' +
     '</div>' +
     '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '">×</button>' +
   '</div>';
@@ -355,6 +364,34 @@ function bindFormEvents() {
       var tmp = state.locations[li + 1];
       state.locations[li + 1] = state.locations[li];
       state.locations[li] = tmp;
+      render();
+    });
+  });
+
+  document.querySelectorAll(".move-conn-up-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      var ci = +this.dataset.ci;
+      if (ci === 0) return;
+      collectIntoState();
+      var conns = state.locations[li].connectors;
+      var tmp = conns[ci - 1];
+      conns[ci - 1] = conns[ci];
+      conns[ci] = tmp;
+      render();
+    });
+  });
+
+  document.querySelectorAll(".move-conn-down-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var li = +this.dataset.li;
+      var ci = +this.dataset.ci;
+      collectIntoState();
+      var conns = state.locations[li].connectors;
+      if (ci >= conns.length - 1) return;
+      var tmp = conns[ci + 1];
+      conns[ci + 1] = conns[ci];
+      conns[ci] = tmp;
       render();
     });
   });

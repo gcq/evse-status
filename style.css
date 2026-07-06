@@ -407,12 +407,11 @@ h1 {
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
-.s-rule-row:last-of-type {
-  border-bottom: none;
+.s-rules > * + * {
+  border-top: 1px solid var(--border);
 }
 
 .s-rule-label {
@@ -462,6 +461,21 @@ h1 {
   flex-wrap: wrap;
 }
 
+.s-conn-move {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.s-conn-move .btn {
+  min-height: 20px;
+  min-width: 28px;
+  padding: 0;
+  font-size: 12px;
+  border-width: 1px;
+}
+
 .s-conn-row .s-field {
   flex: 1;
   min-width: 150px;
@@ -505,7 +519,6 @@ h1 {
   align-items: center;
   gap: 12px;
   padding: 8px 0 8px 32px;
-  border-bottom: 1px solid var(--border);
 }
 
 .s-rule-row.enabled + .s-rule-subrow {
