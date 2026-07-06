@@ -309,20 +309,17 @@ function renderCard(location, index) {
   var active = activeConnectors(location);
   if (active.length === 0) return '';
 
-  var refreshIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>';
   var refreshBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '">' + refreshIcon + '</button>'
+    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '">' + ICONS.refresh + '</button>'
     : '';
 
-  var autoIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg>';
   var isAutoOnly = index != null && window.LOCATIONS[index] && window.LOCATIONS[index].autoRefresh;
   var autoBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="Auto-refresh only this location">' + autoIcon + '</button>'
+    ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="Auto-refresh only this location">' + ICONS.auto + '</button>'
     : '';
 
-  var eyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>';
   var hideBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="Hide this location">' + eyeIcon + '</button>'
+    ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="Hide this location">' + ICONS.eye + '</button>'
     : '';
 
   return renderCardBody(location, index, active, refreshBtn + autoBtn + hideBtn);
@@ -354,8 +351,7 @@ function tickLastUpdatedTexts() {
 }
 
 function renderHiddenCard(location, index) {
-  var closedEyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
-  var unhideBtn = '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location">' + closedEyeIcon + '</button>';
+  var unhideBtn = '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location">' + ICONS.eyeOff + '</button>';
 
   return renderCardBody(location, index, activeConnectors(location), unhideBtn);
 }
