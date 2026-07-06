@@ -49,6 +49,7 @@ function input(id, value, opts) {
     (opts.max !== undefined ? ' max="' + opts.max + '"' : '') +
     (opts.step ? ' step="' + opts.step + '"' : '') +
     (opts.readonly ? ' readonly' : '') +
+    (opts.disabled ? ' disabled' : '') +
     '>';
 }
 
@@ -182,7 +183,7 @@ function buildLocation(loc, li) {
       '</label>' +
       '<div class="s-rule-inputs">' +
         '<input class="s-input s-input-narrow" type="number" data-fid="loc-' + li + '-maxDuration-hours"' +
-          ' value="' + esc(maxDur ? maxDur.hours : 4) + '" min="0.5" step="0.5" placeholder="hrs">' +
+          ' value="' + esc(maxDur ? maxDur.hours : 4) + '" min="0.5" step="0.5" placeholder="hrs"' + (maxDur ? "" : " disabled") + '>' +
         '<span class="s-unit">h</span>' +
         '<span class="s-error" data-err="loc-' + li + '-maxDuration-hours"></span>' +
       '</div>' +
@@ -195,10 +196,10 @@ function buildLocation(loc, li) {
       '</label>' +
       '<div class="s-rule-inputs">' +
         '<input class="s-input s-input-time" type="time" data-fid="loc-' + li + '-freeStart"' +
-          ' value="' + esc(freeChg ? freeChg.start : "22:00") + '">' +
+          ' value="' + esc(freeChg ? freeChg.start : "22:00") + '"' + (freeChg ? "" : " disabled") + '>' +
         '<span class="s-unit">to</span>' +
         '<input class="s-input s-input-time" type="time" data-fid="loc-' + li + '-freeEnd"' +
-          ' value="' + esc(freeChg ? freeChg.end : "08:00") + '">' +
+          ' value="' + esc(freeChg ? freeChg.end : "08:00") + '"' + (freeChg ? "" : " disabled") + '>' +
         '<span class="s-error" data-err="loc-' + li + '-freeCharging"></span>' +
       '</div>' +
     '</div>' +
@@ -410,6 +411,9 @@ function bindFormEvents() {
     cb.addEventListener("change", function() {
       var row = this.closest(".s-rule-row") || this.closest(".s-rule-subrow");
       row.classList.toggle("enabled", this.checked);
+      row.querySelectorAll(".s-rule-inputs .s-input").forEach(function(input) {
+        input.disabled = !cb.checked;
+      });
     });
   });
 }
