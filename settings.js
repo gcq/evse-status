@@ -1,5 +1,11 @@
 var state = null;
 
+function swapInPlace(arr, i, j) {
+  var t = arr[i];
+  arr[i] = arr[j];
+  arr[j] = t;
+}
+
 var eyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>';
 var closedEyeIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
 
@@ -350,9 +356,7 @@ function bindFormEvents() {
       var li = +this.dataset.li;
       if (li === 0) return;
       collectIntoState();
-      var tmp = state.locations[li - 1];
-      state.locations[li - 1] = state.locations[li];
-      state.locations[li] = tmp;
+      swapInPlace(state.locations, li - 1, li);
       render();
     });
   });
@@ -362,9 +366,7 @@ function bindFormEvents() {
       var li = +this.dataset.li;
       if (li >= state.locations.length - 1) return;
       collectIntoState();
-      var tmp = state.locations[li + 1];
-      state.locations[li + 1] = state.locations[li];
-      state.locations[li] = tmp;
+      swapInPlace(state.locations, li, li + 1);
       render();
     });
   });
@@ -375,10 +377,7 @@ function bindFormEvents() {
       var ci = +this.dataset.ci;
       if (ci === 0) return;
       collectIntoState();
-      var conns = state.locations[li].connectors;
-      var tmp = conns[ci - 1];
-      conns[ci - 1] = conns[ci];
-      conns[ci] = tmp;
+      swapInPlace(state.locations[li].connectors, ci - 1, ci);
       render();
     });
   });
@@ -390,9 +389,7 @@ function bindFormEvents() {
       collectIntoState();
       var conns = state.locations[li].connectors;
       if (ci >= conns.length - 1) return;
-      var tmp = conns[ci + 1];
-      conns[ci + 1] = conns[ci];
-      conns[ci] = tmp;
+      swapInPlace(conns, ci, ci + 1);
       render();
     });
   });
