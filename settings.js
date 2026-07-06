@@ -144,8 +144,7 @@ function buildLocation(loc, li) {
   var maxDur = rules.maxChargeDuration || null;
   var notCharging = !!rules.mustLeaveWhenNotCharging;
   var freeChg = rules.freeCharging || null;
-  var notChargingCapWarning = !hasCapability(loc.cpo, "CONNECTED_NOT_CHARGING")
-    ? '<span class="s-cap-warn">not supported by ' + esc(loc.cpo) + '</span>' : "";
+  var supportsNotCharging = hasCapability(loc.cpo, "CONNECTED_NOT_CHARGING");
 
   var coords = (loc.lat != null && loc.lon != null) ? (loc.lat.toFixed(5) + ", " + loc.lon.toFixed(5)) : "—";
 
@@ -195,33 +194,34 @@ function buildLocation(loc, li) {
       '</div>' +
     '</div>' +
 
-    '<div class="s-rule-row' + (notCharging ? " enabled" : "") + '" data-rule="mustLeaveWhenNotCharging">' +
-      '<label class="s-rule-label">' +
-        '<input class="s-checkbox rule-toggle" type="checkbox"' + (notCharging ? " checked" : "") + '> ' +
-        'Must leave when not charging' +
-      '</label>' +
-      notChargingCapWarning +
-    '</div>';
+    (supportsNotCharging ?
+      '<div class="s-rule-row' + (notCharging ? " enabled" : "") + '" data-rule="mustLeaveWhenNotCharging">' +
+        '<label class="s-rule-label">' +
+          '<input class="s-checkbox rule-toggle" type="checkbox"' + (notCharging ? " checked" : "") + '> ' +
+          'Must leave when not charging' +
+        '</label>' +
+      '</div>'
+    : "");
 
   var rightCol =
-    '<span class="s-error" data-err="loc-' + li + '-connectors"></span>' +
-    buildConnectors(loc, li);
+    buildConnectors(loc, li) +
+    '<span class="s-error" data-err="loc-' + li + '-connectors"></span>';
 
   var total = state.locations.length;
+  var footer =
+    '<div class="s-card-footer">' +
+      '<button class="btn btn-ghost btn-icon move-up-btn" data-li="' + li + '" ' + (li === 0 ? 'disabled' : '') + '>↑</button>' +
+      '<button class="btn btn-ghost btn-icon move-down-btn" data-li="' + li + '" ' + (li === total - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button class="btn btn-danger remove-loc-btn" data-li="' + li + '">Remove</button>' +
+    '</div>';
+
   return '<div class="s-card loc-card" data-li="' + li + '">' +
-    '<div class="s-card-header">' +
-      '<h3 class="s-card-title">Location ' + (li + 1) + '</h3>' +
-      '<div style="display:flex;gap:6px;align-items:center">' +
-        '<button class="btn btn-ghost btn-icon move-up-btn" data-li="' + li + '" ' + (li === 0 ? 'disabled' : '') + '>↑</button>' +
-        '<button class="btn btn-ghost btn-icon move-down-btn" data-li="' + li + '" ' + (li === total - 1 ? 'disabled' : '') + '>↓</button>' +
-        '<button class="btn btn-danger remove-loc-btn" data-li="' + li + '">Remove</button>' +
-      '</div>' +
-    '</div>' +
     '<div class="loc-columns">' +
       '<div class="loc-col-settings">' + leftCol + '</div>' +
       '<div class="loc-col-connectors">' +
         '<h4 class="s-subsection-title" style="margin-top:0">Connectors</h4>' +
         rightCol +
+        footer +
       '</div>' +
     '</div>' +
   '</div>';
