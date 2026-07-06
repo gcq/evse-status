@@ -96,7 +96,10 @@ function geolocate() {
 
 // ── Search ────────────────────────────────────────────────────────────────
 
+var searchGeneration = 0;
+
 function searchAll(lat, lon, bounds) {
+  var gen = ++searchGeneration;
   setStatus("Searching…");
   clearStationMarkers();
   document.getElementById("results").innerHTML = "";
@@ -117,6 +120,7 @@ function searchAll(lat, lon, bounds) {
     });
 
   Promise.all(searches).then(function(results) {
+    if (gen !== searchGeneration) return;
     stations = [];
     results.forEach(function(arr) {
       arr.forEach(function(s) { stations.push(s); });
