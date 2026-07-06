@@ -246,7 +246,7 @@ h1 {
   gap: 12px;
 }
 
-.s-field-row .s-field {
+.s-field-row > .s-field {
   flex: 1 1 160px;
   min-width: 160px;
 }
@@ -299,13 +299,17 @@ h1 {
   background: transparent;
   border: none;
   border-radius: 4px;
-  padding: 10px 16px;
+  padding: 10px 8px;
   font-size: 14px;
   font-weight: 500;
   font-family: inherit;
   color: var(--text-secondary);
   cursor: pointer;
   min-height: 36px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: background-color 0.2s, color 0.2s;
 }
 
@@ -502,9 +506,10 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   padding: 14px 16px;
   cursor: pointer;
-  gap: 12px;
+  gap: 8px 12px;
   user-select: none;
 }
 
@@ -515,7 +520,7 @@ h1 {
   flex-direction: column;
   gap: 2px;
   flex: 1;
-  min-width: 0;
+  min-width: 140px;
   overflow: hidden;
 }
 
@@ -528,8 +533,9 @@ h1 {
 .discover-station-aside {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  flex-shrink: 0;
 }
 
 .dist-chip {
@@ -619,8 +625,9 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   padding: 16px 20px 12px;
-  gap: 12px;
+  gap: 8px 12px;
 }
 
 .location-name {
@@ -628,6 +635,7 @@ h1 {
   font-weight: 500;
   color: var(--text-primary);
   flex: 1;
+  min-width: 140px;
 }
 
 body.left-handed .card-header .hide-loc-btn         { order: 1; }
@@ -671,6 +679,7 @@ body.left-handed .card-header .location-name        { text-align: right; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   padding: 16px 20px;
   gap: 12px;
   border-bottom: 1px solid var(--border);
@@ -685,6 +694,7 @@ body.left-handed .card-header .location-name        { text-align: right; }
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  min-width: 140px;
 }
 
 .connector-name {
@@ -701,6 +711,8 @@ body.left-handed .card-header .location-name        { text-align: right; }
 .connector-status {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
   flex-direction: row-reverse;
 }

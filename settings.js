@@ -111,7 +111,7 @@ function buildGlobal() {
           { value: "config",   label: "Manual" },
           { value: "distance", label: "Distance" }
         ], state.locationOrder || "config") +
-        '<span class="s-hint">Distance mode uses your live location (high-accuracy GPS) to sort</span>' +
+        '<span class="s-hint">Distance mode uses your live location to sort</span>' +
       '</div>' +
     '</div>' +
     distanceRelatedFields +
