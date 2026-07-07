@@ -23,6 +23,7 @@ function defaultConfig() {
     theme: "auto",
     locationOrder: "config",
     maxDistanceKm: null,
+    flashOnAvailable: true,
     locations: (typeof LOCATIONS !== "undefined")
       ? JSON.parse(JSON.stringify(LOCATIONS))
       : []

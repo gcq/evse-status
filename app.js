@@ -4,6 +4,7 @@ var refreshTimer = null;
 var countdown = REFRESH_INTERVAL;
 var countdownTimer = null;
 var globalEnabled = true;
+var flashOnAvailableEnabled = true;
 var missedRefreshWhileHidden = false;
 // Wall-clock deadline for the next auto-refresh. The displayed countdown is
 // derived from this on every tick instead of being decremented by hand, so it
@@ -671,7 +672,7 @@ async function fetchAndRenderLocation(i) {
     slot.innerHTML = html;
     slot.style.display = html ? "" : "none";
     slot.style.opacity = timedOut ? "0.5" : "";
-    if (justBecameAvailable) flashCard(slot);
+    if (justBecameAvailable && flashOnAvailableEnabled) flashCard(slot);
   }
 
   renderOosSection();
@@ -748,6 +749,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (cfg.maxDistanceKm) maxDistanceKm = cfg.maxDistanceKm;
     if (cfg.locationOrder === "distance") locationOrder = "distance";
     globalEnabled = (cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
+    flashOnAvailableEnabled = cfg.flashOnAvailable === false ? false : true;
     // Defensive: "all locations" mode and per-location auto-refresh are
     // mutually exclusive — don't trust stale/hand-edited config to agree.
     if (globalEnabled) LOCATIONS.forEach(function(loc) { loc.autoRefresh = false; });

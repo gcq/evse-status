@@ -82,7 +82,9 @@ function segmentedControl(id, options, selected) {
 }
 
 function buildGlobal() {
-  var distanceRelatedFields = (state.locationOrder === "distance")
+  // Sits in the same flex row as Location order — right after it, wrapping
+  // onto its own line only when there isn't room to share one.
+  var maxDistanceField = (state.locationOrder === "distance")
     ? field("g-max-distance", "Max distance (km)",
         input("g-max-distance", state.maxDistanceKm != null ? state.maxDistanceKm : "", { type: "number", step: "any", min: 0, placeholder: "e.g. 30" }),
         "Leave blank for no cutoff — locations further than this move to a collapsed \"Out of range\" section")
@@ -101,12 +103,12 @@ function buildGlobal() {
         '<span class="s-hint" id="system-theme-hint">' + systemThemeHint() + '</span>' +
       '</div>' +
       '<div class="s-field">' +
-        '<label class="s-label">Driving side</label>' +
-        segmentedControl("g-handedness", [
-          { value: "left",  label: "Left" },
-          { value: "right", label: "Right" }
-        ], state.handedness || "right") +
-        '<span class="s-hint">Controls move to the opposite side, near your hand</span>' +
+        '<label class="s-label">Flash on available</label>' +
+        segmentedControl("g-flash-available", [
+          { value: "off", label: "Off" },
+          { value: "on",  label: "On" }
+        ], state.flashOnAvailable === false ? "off" : "on") +
+        '<span class="s-hint">Briefly highlight a card when a connector becomes available</span>' +
       '</div>' +
       '<div class="s-field">' +
         '<label class="s-label">Location order</label>' +
@@ -116,8 +118,16 @@ function buildGlobal() {
         ], state.locationOrder || "config") +
         '<span class="s-hint">Distance mode uses your live location to sort</span>' +
       '</div>' +
+      maxDistanceField +
+      '<div class="s-field">' +
+        '<label class="s-label">Driving side</label>' +
+        segmentedControl("g-handedness", [
+          { value: "left",  label: "Left" },
+          { value: "right", label: "Right" }
+        ], state.handedness || "right") +
+        '<span class="s-hint">Controls move to the opposite side, near your hand</span>' +
+      '</div>' +
     '</div>' +
-    distanceRelatedFields +
   '</section>';
 }
 
@@ -300,6 +310,8 @@ function bindFormEvents() {
           collectIntoState();
           state.locationOrder = btn.dataset.value;
           render();
+        } else if (group.id === "g-flash-available") {
+          state.flashOnAvailable = btn.dataset.value === "on";
         }
       });
     });
@@ -409,6 +421,8 @@ function collectIntoState() {
   if (handEl) state.handedness = handEl.dataset.value;
   var orderEl = document.getElementById("g-location-order");
   if (orderEl) state.locationOrder = orderEl.dataset.value;
+  var flashEl = document.getElementById("g-flash-available");
+  if (flashEl) state.flashOnAvailable = flashEl.dataset.value === "on";
   var maxDistEl = document.querySelector('[data-fid="g-max-distance"]');
   if (maxDistEl) {
     var maxDist = parseFloat(maxDistEl.value);
