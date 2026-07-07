@@ -601,9 +601,39 @@ async function autoRefreshTick() {
 // out-of-service/hidden/out-of-range sections. Never throws — a fetch
 // failure becomes an error-state result like any other, since callers just
 // need to know when this location is done, not whether it succeeded.
+// True if any connector present in both results moved from some other status
+// into AVAILABLE — the signal that's worth flashing the card for. Connectors
+// with no known prior status (first load, or newly appeared) don't count:
+// there's nothing to say they "became" available from.
+function hasNewlyAvailableConnector(prevResult, newResult) {
+  if (!prevResult || !newResult) return false;
+  var prevStatusById = {};
+  (prevResult.connectors || []).forEach(function(c) { prevStatusById[c.id] = c.status; });
+  return (newResult.connectors || []).some(function(c) {
+    var prevStatus = prevStatusById[c.id];
+    return prevStatus != null && prevStatus !== "AVAILABLE" && c.status === "AVAILABLE";
+  });
+}
+
+// Restartable even if a previous flash on this card hasn't finished yet
+// (e.g. two connectors free up back-to-back) — the reflow forces the browser
+// to notice the class was removed before it's re-added.
+function flashCard(slot) {
+  var card = slot.querySelector(".card");
+  if (!card) return;
+  card.classList.remove("card-flash");
+  void card.offsetWidth;
+  card.classList.add("card-flash");
+  card.addEventListener("animationend", function handler() {
+    card.classList.remove("card-flash");
+    card.removeEventListener("animationend", handler);
+  });
+}
+
 async function fetchAndRenderLocation(i) {
   var loc = window.LOCATIONS[i];
-  var hadPriorResult = !!(locationResults[i] && !locationResults[i].error);
+  var priorResult = locationResults[i];
+  var hadPriorResult = !!(priorResult && !priorResult.error);
   var signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   var result;
   var timedOut = false;
@@ -629,6 +659,10 @@ async function fetchAndRenderLocation(i) {
       locationUpdateFailed[i] = false;
     }
   }
+  // Also fires after a catch-up refresh triggered by the tab regaining
+  // visibility, since that goes through this same function/comparison — a
+  // status change while backgrounded still gets flashed once it's visible.
+  var justBecameAvailable = !timedOut && hadPriorResult && hasNewlyAvailableConnector(priorResult, result);
   locationResults[i] = result;
 
   var slot = document.getElementById("card-slot-" + i);
@@ -637,6 +671,7 @@ async function fetchAndRenderLocation(i) {
     slot.innerHTML = html;
     slot.style.display = html ? "" : "none";
     slot.style.opacity = timedOut ? "0.5" : "";
+    if (justBecameAvailable) flashCard(slot);
   }
 
   renderOosSection();

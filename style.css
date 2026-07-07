@@ -688,6 +688,29 @@ h1 {
   border-color: var(--red);
 }
 
+/* Two accent-colored pulses — tinted background, glow, and a slight scale
+   pop, not just a border ring — played once when a connector newly becomes
+   available. Distinct from --green, which already means "currently
+   available" on the status badge itself. */
+@keyframes card-flash {
+  0%, 30%, 70%, 100% {
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: none;
+    transform: scale(1);
+  }
+  15%, 50% {
+    background: color-mix(in srgb, var(--accent) 25%, var(--surface));
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent), 0 0 24px 6px var(--accent);
+    transform: scale(1.02);
+  }
+}
+
+.card-flash {
+  animation: card-flash 1.5s ease-in-out;
+}
+
 .card-header {
   display: flex;
   align-items: center;
