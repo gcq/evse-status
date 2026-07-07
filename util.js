@@ -21,6 +21,7 @@ function defaultConfig() {
   return {
     handedness: (typeof HANDEDNESS !== "undefined") ? HANDEDNESS : "right",
     theme: "auto",
+    locale: "auto",
     locationOrder: "config",
     maxDistanceKm: null,
     flashOnAvailable: true,
@@ -50,6 +51,28 @@ function esc(s) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+var deployedVersionPromise = null;
+
+// Fetches the live-deployed commit sha once per page load and memoizes the
+// promise, so both the footer and l10n.js's cache-busting query param (which
+// needs this before translations are even loaded, hence no t() here) share
+// one network call instead of two. Time-boxed short: this sits in front of
+// every page render (l10n.js awaits it before loading a locale), so a slow
+// or unreachable GitHub API must fail fast and fall back cleanly rather than
+// stall the whole app.
+function getDeployedVersion() {
+  if (!deployedVersionPromise) {
+    deployedVersionPromise = fetch(
+      "https://api.github.com/repos/gcq/evse-status/deployments?environment=github-pages&per_page=1",
+      { signal: AbortSignal.timeout(4000) }
+    )
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(deployments) { return (deployments && deployments[0]) ? deployments[0].sha : null; })
+      .catch(function() { return null; }); // offline/rate-limited/timed out — caller falls back
+  }
+  return deployedVersionPromise;
+}
+
 // Pages deploys straight from `main` with no build step, and deploys have
 // been failing often enough that "what's live" can silently lag `main` —
 // this surfaces the actual deployed commit so that's visible at a glance
@@ -57,13 +80,9 @@ function esc(s) {
 function renderDeployInfo(elId) {
   var el = document.getElementById(elId);
   if (!el) return;
-  fetch("https://api.github.com/repos/gcq/evse-status/deployments?environment=github-pages&per_page=1")
-    .then(function(r) { return r.ok ? r.json() : null; })
-    .then(function(deployments) {
-      if (!deployments || !deployments.length) return;
-      var sha = deployments[0].sha;
-      el.textContent = "Deployed " + sha.slice(0, 7);
-      el.href = "https://github.com/gcq/evse-status/commit/" + sha;
-    })
-    .catch(function() { /* offline/rate-limited — leave the footer blank */ });
+  getDeployedVersion().then(function(sha) {
+    if (!sha) return;
+    el.textContent = t("deploy-version", { sha: sha.slice(0, 7) });
+    el.href = "https://github.com/gcq/evse-status/commit/" + sha;
+  });
 }

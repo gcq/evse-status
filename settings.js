@@ -8,8 +8,17 @@ function swapInPlace(arr, i, j) {
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 
-function init() {
+async function init() {
+  await initL10n();
   renderDeployInfo("deploy-info");
+  document.documentElement.lang = l10nActiveLocale;
+  document.title = t("doc-title-settings");
+  var h1 = document.querySelector("header h1");
+  if (h1) h1.textContent = t("nav-settings");
+  document.getElementById("back-link").textContent = t("nav-back");
+  document.getElementById("save-btn").textContent = t("nav-save");
+  document.getElementById("reset-btn").textContent = t("nav-reset");
+
   state = loadConfig();
   render();
   document.getElementById("save-btn").addEventListener("click", save);
@@ -86,47 +95,57 @@ function buildGlobal() {
   // Sits in the same flex row as Location order — right after it, wrapping
   // onto its own line only when there isn't room to share one.
   var maxDistanceField = (state.locationOrder === "distance")
-    ? field("g-max-distance", "Max distance (km)",
-        input("g-max-distance", state.maxDistanceKm != null ? state.maxDistanceKm : "", { type: "number", step: "any", min: 0, placeholder: "e.g. 30" }),
-        "Leave blank for no cutoff — locations further than this move to a collapsed \"Out of range\" section")
+    ? field("g-max-distance", t("field-max-distance"),
+        input("g-max-distance", state.maxDistanceKm != null ? state.maxDistanceKm : "", { type: "number", step: "any", min: 0, placeholder: t("max-distance-placeholder") }),
+        t("max-distance-hint"))
     : "";
 
   return '<section class="s-section">' +
-    '<h2 class="s-section-title">Display</h2>' +
+    '<h2 class="s-section-title">' + t("section-display") + '</h2>' +
     '<div class="s-field-row">' +
       '<div class="s-field">' +
-        '<label class="s-label">Theme</label>' +
+        '<label class="s-label">' + t("field-theme") + '</label>' +
         segmentedControl("g-theme", [
-          { value: "auto",  label: "Auto" },
-          { value: "dark",  label: "Dark" },
-          { value: "light", label: "Light" }
+          { value: "auto",  label: t("theme-auto") },
+          { value: "dark",  label: t("theme-dark") },
+          { value: "light", label: t("theme-light") }
         ], state.theme || "auto") +
         '<span class="s-hint" id="system-theme-hint">' + systemThemeHint() + '</span>' +
       '</div>' +
       '<div class="s-field">' +
-        '<label class="s-label">Flash on available</label>' +
+        '<label class="s-label">' + t("field-flash") + '</label>' +
         segmentedControl("g-flash-available", [
-          { value: "off", label: "Off" },
-          { value: "on",  label: "On" }
+          { value: "off", label: t("flash-off") },
+          { value: "on",  label: t("flash-on") }
         ], state.flashOnAvailable === false ? "off" : "on") +
-        '<span class="s-hint">Briefly highlight a card when a connector becomes available</span>' +
+        '<span class="s-hint">' + t("flash-hint") + '</span>' +
       '</div>' +
       '<div class="s-field">' +
-        '<label class="s-label">Location order</label>' +
+        '<label class="s-label">' + t("field-location-order") + '</label>' +
         segmentedControl("g-location-order", [
-          { value: "config",   label: "Manual" },
-          { value: "distance", label: "Distance" }
+          { value: "config",   label: t("order-manual") },
+          { value: "distance", label: t("order-distance") }
         ], state.locationOrder || "config") +
-        '<span class="s-hint">Distance mode uses your live location to sort</span>' +
+        '<span class="s-hint">' + t("location-order-hint") + '</span>' +
       '</div>' +
       maxDistanceField +
       '<div class="s-field">' +
-        '<label class="s-label">Driving side</label>' +
+        '<label class="s-label">' + t("field-driving-side") + '</label>' +
         segmentedControl("g-handedness", [
-          { value: "left",  label: "Left" },
-          { value: "right", label: "Right" }
+          { value: "left",  label: t("side-left") },
+          { value: "right", label: t("side-right") }
         ], state.handedness || "right") +
-        '<span class="s-hint">Controls move to the opposite side, near your hand</span>' +
+        '<span class="s-hint">' + t("driving-side-hint") + '</span>' +
+      '</div>' +
+      '<div class="s-field">' +
+        '<label class="s-label">' + t("field-language") + '</label>' +
+        segmentedControl("g-language", [
+          { value: "auto", label: t("language-auto") },
+          { value: "en",   label: t("language-en") },
+          { value: "es",   label: t("language-es") },
+          { value: "ca",   label: t("language-ca") }
+        ], state.locale || "auto") +
+        '<span class="s-hint">' + languageAutoHint() + '</span>' +
       '</div>' +
     '</div>' +
   '</section>';
@@ -137,8 +156,8 @@ function buildLocations() {
   var noLocError = '<span class="s-error" data-err="no-locations"></span>';
   return '<section class="s-section">' +
     '<div class="s-section-header">' +
-      '<h2 class="s-section-title">Locations</h2>' +
-      '<button class="btn btn-primary" id="add-loc-btn">Find nearby</button>' +
+      '<h2 class="s-section-title">' + t("section-locations") + '</h2>' +
+      '<button class="btn btn-primary" id="add-loc-btn">' + t("btn-find-nearby") + '</button>' +
     '</div>' +
     noLocError +
     locCards +
@@ -154,35 +173,37 @@ function buildLocation(loc, li) {
 
   var coords = (loc.lat != null && loc.lon != null) ? (loc.lat.toFixed(5) + ", " + loc.lon.toFixed(5)) : "—";
 
+  var toggleTitle = loc.hidden ? t("btn-show-on-list") : t("btn-hide-from-list");
+
   var leftCol =
     '<div class="s-field-row">' +
       '<div class="s-field s-field-inline">' +
         '<div class="s-field-inline-row">' +
-          '<label class="s-label">Name</label>' +
-          input("loc-" + li + "-displayName", loc.displayName, { placeholder: "e.g. Moli" }) +
+          '<label class="s-label">' + t("field-name") + '</label>' +
+          input("loc-" + li + "-displayName", loc.displayName, { placeholder: t("name-placeholder") }) +
         '</div>' +
         '<span class="s-error" data-err="loc-' + li + '-displayName"></span>' +
       '</div>' +
-      '<button type="button" class="btn btn-ghost btn-icon loc-hidden-toggle-btn' + (loc.hidden ? " active" : "") + '" data-li="' + li + '" title="' + (loc.hidden ? "Show on main list" : "Hide from main list") + '" aria-label="' + (loc.hidden ? "Show on main list" : "Hide from main list") + '">' +
+      '<button type="button" class="btn btn-ghost btn-icon loc-hidden-toggle-btn' + (loc.hidden ? " active" : "") + '" data-li="' + li + '" title="' + esc(toggleTitle) + '" aria-label="' + esc(toggleTitle) + '">' +
         (loc.hidden ? ICONS.eyeOff : ICONS.eye) +
       '</button>' +
     '</div>' +
 
     '<div class="s-field-row">' +
-      staticField("CPO", cpoLabel(loc.cpo)) +
-      staticField("Location ID", loc.id, { hint: mergedChargerHint(loc) }) +
-      staticField("Coordinates", coords) +
-      staticField("Address", loc.address || "—") +
+      staticField(t("static-cpo"), cpoLabel(loc.cpo)) +
+      staticField(t("static-location-id"), loc.id, { hint: mergedChargerHint(loc) }) +
+      staticField(t("static-coordinates"), coords) +
+      staticField(t("static-address"), loc.address || "—") +
     '</div>' +
 
-    '<h4 class="s-subsection-title">Rules</h4>' +
+    '<h4 class="s-subsection-title">' + t("subsection-rules") + '</h4>' +
 
     '<div class="s-rules">' +
 
     '<div class="s-rule-row' + (maxDur ? " enabled" : "") + '" data-rule="maxChargeDuration">' +
       '<label class="s-rule-label">' +
         '<input class="s-checkbox rule-toggle" type="checkbox"' + (maxDur ? " checked" : "") + '> ' +
-        'Max charge duration' +
+        t("rule-max-duration") +
       '</label>' +
       '<div class="s-rule-inputs">' +
         '<input class="s-input s-input-narrow" type="number" data-fid="loc-' + li + '-maxDuration-hours"' +
@@ -195,12 +216,12 @@ function buildLocation(loc, li) {
     '<div class="s-rule-subrow' + (freeChg ? " enabled" : "") + '" data-rule="freeCharging">' +
       '<label class="s-rule-label">' +
         '<input class="s-checkbox rule-toggle" type="checkbox"' + (freeChg ? " checked" : "") + '> ' +
-        'No limit during:' +
+        t("rule-no-limit") +
       '</label>' +
       '<div class="s-rule-inputs">' +
         '<input class="s-input s-input-time" type="time" data-fid="loc-' + li + '-freeStart"' +
           ' value="' + esc(freeChg ? freeChg.start : "22:00") + '"' + (freeChg ? "" : " disabled") + '>' +
-        '<span class="s-unit">to</span>' +
+        '<span class="s-unit">' + t("time-range-to") + '</span>' +
         '<input class="s-input s-input-time" type="time" data-fid="loc-' + li + '-freeEnd"' +
           ' value="' + esc(freeChg ? freeChg.end : "08:00") + '"' + (freeChg ? "" : " disabled") + '>' +
         '<span class="s-error" data-err="loc-' + li + '-freeCharging"></span>' +
@@ -211,7 +232,7 @@ function buildLocation(loc, li) {
       '<div class="s-rule-row' + (notCharging ? " enabled" : "") + '" data-rule="mustLeaveWhenNotCharging">' +
         '<label class="s-rule-label">' +
           '<input class="s-checkbox rule-toggle" type="checkbox"' + (notCharging ? " checked" : "") + '> ' +
-          'Must leave when not charging' +
+          t("rule-must-leave") +
         '</label>' +
       '</div>'
     : "") +
@@ -225,16 +246,16 @@ function buildLocation(loc, li) {
   var total = state.locations.length;
   var footer =
     '<div class="s-card-footer">' +
-      '<button class="btn btn-ghost btn-icon move-up-btn" data-li="' + li + '" title="Move up" aria-label="Move up" ' + (li === 0 ? 'disabled' : '') + '>↑</button>' +
-      '<button class="btn btn-ghost btn-icon move-down-btn" data-li="' + li + '" title="Move down" aria-label="Move down" ' + (li === total - 1 ? 'disabled' : '') + '>↓</button>' +
-      '<button class="btn btn-danger remove-loc-btn" data-li="' + li + '">Remove</button>' +
+      '<button class="btn btn-ghost btn-icon move-up-btn" data-li="' + li + '" title="' + esc(t("btn-move-up")) + '" aria-label="' + esc(t("btn-move-up")) + '" ' + (li === 0 ? 'disabled' : '') + '>↑</button>' +
+      '<button class="btn btn-ghost btn-icon move-down-btn" data-li="' + li + '" title="' + esc(t("btn-move-down")) + '" aria-label="' + esc(t("btn-move-down")) + '" ' + (li === total - 1 ? 'disabled' : '') + '>↓</button>' +
+      '<button class="btn btn-danger remove-loc-btn" data-li="' + li + '">' + t("btn-remove") + '</button>' +
     '</div>';
 
   return '<div class="s-card loc-card" data-li="' + li + '">' +
     '<div class="loc-columns">' +
       '<div class="loc-col-settings">' + leftCol + '</div>' +
       '<div class="loc-col-connectors">' +
-        '<h4 class="s-subsection-title" style="margin-top:0">Connectors</h4>' +
+        '<h4 class="s-subsection-title" style="margin-top:0">' + t("subsection-connectors") + '</h4>' +
         rightCol +
         footer +
       '</div>' +
@@ -250,21 +271,21 @@ function buildConnectors(loc, li) {
 }
 
 function buildConnector(conn, li, ci, total) {
-  var chargerBadge = conn.chargerId ? " (charger " + esc(conn.chargerId) + ")" : "";
+  var idLabel = conn.chargerId ? t("conn-id-with-charger", { chargerId: esc(conn.chargerId) }) : t("conn-id");
   return '<div class="s-conn-row conn-row" data-li="' + li + '" data-ci="' + ci + '">' +
-    staticField("ID" + chargerBadge, conn.id) +
+    staticField(idLabel, conn.id) +
     '<div class="s-field s-field-inline">' +
       '<div class="s-field-inline-row">' +
-        '<label class="s-label">Name</label>' +
-        input("loc-" + li + "-conn-" + ci + "-name", conn.displayName, { placeholder: "e.g. Charger 1 plug B" }) +
+        '<label class="s-label">' + t("field-name") + '</label>' +
+        input("loc-" + li + "-conn-" + ci + "-name", conn.displayName, { placeholder: t("conn-name-placeholder") }) +
       '</div>' +
       '<span class="s-error" data-err="loc-' + li + '-conn-' + ci + '-name"></span>' +
     '</div>' +
     '<div class="s-conn-move">' +
-      '<button type="button" class="btn btn-ghost btn-icon move-conn-up-btn" data-li="' + li + '" data-ci="' + ci + '" title="Move up" aria-label="Move up" ' + (ci === 0 ? "disabled" : "") + '>↑</button>' +
-      '<button type="button" class="btn btn-ghost btn-icon move-conn-down-btn" data-li="' + li + '" data-ci="' + ci + '" title="Move down" aria-label="Move down" ' + (ci === total - 1 ? "disabled" : "") + '>↓</button>' +
+      '<button type="button" class="btn btn-ghost btn-icon move-conn-up-btn" data-li="' + li + '" data-ci="' + ci + '" title="' + esc(t("btn-move-up")) + '" aria-label="' + esc(t("btn-move-up")) + '" ' + (ci === 0 ? "disabled" : "") + '>↑</button>' +
+      '<button type="button" class="btn btn-ghost btn-icon move-conn-down-btn" data-li="' + li + '" data-ci="' + ci + '" title="' + esc(t("btn-move-down")) + '" aria-label="' + esc(t("btn-move-down")) + '" ' + (ci === total - 1 ? "disabled" : "") + '>↓</button>' +
     '</div>' +
-    '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '" title="Remove connector" aria-label="Remove connector">×</button>' +
+    '<button class="btn btn-danger btn-icon remove-conn-btn" data-li="' + li + '" data-ci="' + ci + '" title="' + esc(t("btn-remove-connector")) + '" aria-label="' + esc(t("btn-remove-connector")) + '">×</button>' +
   '</div>';
 }
 
@@ -282,14 +303,22 @@ function mergedChargerIds(loc) {
 function mergedChargerHint(loc) {
   var extraIds = mergedChargerIds(loc);
   if (extraIds.length === 0) return undefined;
-  return "Also covers charger" + (extraIds.length > 1 ? "s" : "") + " " + extraIds.join(", ");
+  return t("merged-charger-hint", { count: extraIds.length, ids: extraIds.join(", ") });
 }
 
 function systemThemeHint() {
-  if (typeof window.matchMedia !== "function") return "System theme: not supported by this browser";
-  if (window.matchMedia("(prefers-color-scheme: dark)").matches)  return "System theme: dark";
-  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "System theme: light";
-  return "System theme: no preference reported";
+  if (typeof window.matchMedia !== "function") return t("system-theme-unsupported");
+  if (window.matchMedia("(prefers-color-scheme: dark)").matches)  return t("system-theme-dark");
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return t("system-theme-light");
+  return t("system-theme-none");
+}
+
+// Always shows what the browser itself reports (not the current selection —
+// same idea as systemThemeHint above), so "Auto" isn't a mystery.
+function languageAutoHint() {
+  var code = detectBrowserLocale();
+  var names = { en: t("language-en"), es: t("language-es"), ca: t("language-ca") };
+  return t("language-auto-hint", { language: names[code] || code });
 }
 
 // ── Events ────────────────────────────────────────────────────────────────
@@ -297,7 +326,7 @@ function systemThemeHint() {
 function bindFormEvents() {
   document.querySelectorAll(".s-segmented").forEach(function(group) {
     group.querySelectorAll(".s-segment").forEach(function(btn) {
-      btn.addEventListener("click", function() {
+      btn.addEventListener("click", async function() {
         group.querySelectorAll(".s-segment").forEach(function(b) { b.classList.remove("active"); });
         btn.classList.add("active");
         group.dataset.value = btn.dataset.value;
@@ -314,6 +343,20 @@ function bindFormEvents() {
           render();
         } else if (group.id === "g-flash-available") {
           state.flashOnAvailable = btn.dataset.value === "on";
+        } else if (group.id === "g-language") {
+          collectIntoState();
+          state.locale = btn.dataset.value;
+          // Preview the switch immediately (rather than only after Save +
+          // reload) — retranslate the static chrome too, since render()
+          // only rebuilds #form-root.
+          await initL10n(state.locale);
+          document.documentElement.lang = l10nActiveLocale;
+          document.title = t("doc-title-settings");
+          document.querySelector("header h1").textContent = t("nav-settings");
+          document.getElementById("back-link").textContent = t("nav-back");
+          document.getElementById("save-btn").textContent = t("nav-save");
+          document.getElementById("reset-btn").textContent = t("nav-reset");
+          render();
         }
       });
     });
@@ -421,6 +464,8 @@ function collectIntoState() {
   if (themeEl) state.theme = themeEl.dataset.value;
   var handEl = document.getElementById("g-handedness");
   if (handEl) state.handedness = handEl.dataset.value;
+  var langEl = document.getElementById("g-language");
+  if (langEl) state.locale = langEl.dataset.value;
   var orderEl = document.getElementById("g-location-order");
   if (orderEl) state.locationOrder = orderEl.dataset.value;
   var flashEl = document.getElementById("g-flash-available");
@@ -485,39 +530,39 @@ function validate(cfg) {
   var errors = {};
 
   if (cfg.maxDistanceKm != null && cfg.maxDistanceKm < 0)
-    errors["g-max-distance"] = "Must be 0 or greater";
+    errors["g-max-distance"] = t("err-must-be-0-or-greater");
 
   if (cfg.locations.length === 0) {
-    errors["no-locations"] = "At least one location is required";
+    errors["no-locations"] = t("err-at-least-one-location");
     return errors;
   }
 
   cfg.locations.forEach(function(loc, li) {
     if (!loc.displayName.trim())
-      errors["loc-" + li + "-displayName"] = "Required";
+      errors["loc-" + li + "-displayName"] = t("err-required");
 
     if (loc.connectors.length === 0)
-      errors["loc-" + li + "-connectors"] = "At least one connector required";
+      errors["loc-" + li + "-connectors"] = t("err-at-least-one-connector");
 
     loc.connectors.forEach(function(conn, ci) {
       if (!conn.displayName.trim())
-        errors["loc-" + li + "-conn-" + ci + "-name"] = "Required";
+        errors["loc-" + li + "-conn-" + ci + "-name"] = t("err-required");
     });
 
     if (loc.rules) {
       if (loc.rules.maxChargeDuration) {
         var h = loc.rules.maxChargeDuration.hours;
         if (!h || h <= 0)
-          errors["loc-" + li + "-maxDuration-hours"] = "Must be greater than 0";
+          errors["loc-" + li + "-maxDuration-hours"] = t("err-must-be-greater-than-0");
       }
       if (loc.rules.freeCharging) {
         var timeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
         var s = loc.rules.freeCharging.start;
         var e = loc.rules.freeCharging.end;
         if (!timeRe.test(s) || !timeRe.test(e))
-          errors["loc-" + li + "-freeCharging"] = "Enter valid times (HH:MM)";
+          errors["loc-" + li + "-freeCharging"] = t("err-invalid-times");
         else if (s === e)
-          errors["loc-" + li + "-freeCharging"] = "Start and end must differ";
+          errors["loc-" + li + "-freeCharging"] = t("err-start-end-differ");
       }
     }
   });
@@ -557,7 +602,7 @@ function save() {
 }
 
 function resetToDefaults() {
-  if (!confirm("Reset all settings to the built-in defaults from config.js?")) return;
+  if (!confirm(t("confirm-reset"))) return;
   localStorage.removeItem(CONFIG_STORAGE_KEY);
   state = defaultConfig();
   render();

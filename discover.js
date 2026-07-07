@@ -16,7 +16,15 @@ var MARKER_OPEN    = { radius: 9, fillColor: "#f59e0b", color: "#fff",    weight
 
 // ── Init ──────────────────────────────────────────────────────────────────
 
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", async function() {
+  await initL10n();
+  document.documentElement.lang = l10nActiveLocale;
+  document.title = t("doc-title-discover");
+  document.querySelector("header h1").textContent = t("discover-title");
+  document.getElementById("back-link").textContent = t("nav-back");
+  document.getElementById("retry-btn").textContent = t("btn-allow-location");
+  document.getElementById("add-pins-btn").textContent = t("discover-add-to-my-stations");
+
   var cfg = getConfig();
   document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "auto");
   if (cfg && cfg.handedness === "left") document.body.classList.add("left-handed");
@@ -51,9 +59,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function geolocate() {
   setBanner(false);
-  setStatus("Finding your location…");
+  setStatus(t("discover-finding-location"));
   if (!navigator.geolocation) {
-    setStatus("Geolocation is not supported by this browser.", true);
+    setStatus(t("discover-geo-unsupported"), true);
     setBanner(true);
     return;
   }
@@ -84,10 +92,10 @@ function geolocate() {
       }).addTo(map);
       L.circleMarker([lat, lon], {
         radius: 3, fillColor: "#fff", color: "#e82127", weight: 2, fillOpacity: 1
-      }).addTo(map).bindPopup("You are here");
+      }).addTo(map).bindPopup(t("discover-you-are-here"));
     },
     function(err) {
-      setStatus("Location blocked: " + err.message + ". Tap to retry.", true);
+      setStatus(t("discover-geo-blocked", { reason: err.message }), true);
       setBanner(true);
     },
     { timeout: 20000, enableHighAccuracy: false, maximumAge: 60000 }
@@ -100,7 +108,7 @@ var searchGeneration = 0;
 
 function searchAll(lat, lon, bounds) {
   var gen = ++searchGeneration;
-  setStatus("Searching…");
+  setStatus(t("discover-searching"));
   clearStationMarkers();
   document.getElementById("results").innerHTML = "";
 
@@ -129,7 +137,7 @@ function searchAll(lat, lon, bounds) {
     stationGroups = computeStationGroups(stations);
     renderResults();
     var errMsg = adapterErrors.length ? " (" + adapterErrors.join("; ") + ")" : "";
-    setStatus(stations.length + " charger" + (stations.length !== 1 ? "s" : "") + " found" + errMsg, adapterErrors.length > 0);
+    setStatus(t("discover-chargers-found", { count: stations.length }) + errMsg, adapterErrors.length > 0);
   });
 }
 
@@ -178,7 +186,7 @@ function computeStationGroups(list) {
 function renderResults() {
   var container = document.getElementById("results");
   if (stationGroups.length === 0) {
-    container.innerHTML = '<p class="s-hint" style="text-align:center;padding:32px">No chargers found nearby</p>';
+    container.innerHTML = '<p class="s-hint" style="text-align:center;padding:32px">' + t("discover-no-chargers-nearby") + '</p>';
     return;
   }
 
@@ -229,7 +237,7 @@ function renderResults() {
 
 function renderStationGroup(g, gi) {
   var countBadge = g.members.length > 1
-    ? '<span class="cpo-badge" title="Multiple chargers at this site">' + g.members.length + ' chargers</span>'
+    ? '<span class="cpo-badge" title="' + esc(t("discover-multiple-chargers-title")) + '">' + t("discover-chargers-count-badge", { count: g.members.length }) + '</span>'
     : '';
   return '<div class="discover-station" data-gkey="' + esc(g.key) + '" data-gi="' + gi + '">' +
     '<div class="discover-station-header">' +
@@ -262,14 +270,14 @@ function toggleStation(groupKey) {
     return;
   }
 
-  connDiv.innerHTML = '<div class="discover-loading">Loading connectors…</div>';
+  connDiv.innerHTML = '<div class="discover-loading">' + t("discover-loading-connectors") + '</div>';
   card.classList.add("open");
   openStationKeys[groupKey] = true;
   updateMarkerStyle(groupKey);
 
   var adapter = window.ADAPTERS && window.ADAPTERS[group.cpoKey];
   if (!adapter) {
-    connDiv.innerHTML = '<div class="s-error" style="padding:12px">No adapter for ' + esc(group.cpoKey) + '</div>';
+    connDiv.innerHTML = '<div class="s-error" style="padding:12px">' + t("discover-no-adapter", { cpo: esc(group.cpoKey) }) + '</div>';
     connDiv.dataset.loaded = "1";
     return;
   }
@@ -293,7 +301,7 @@ function toggleStation(groupKey) {
       });
     });
     if (!anyConnectors) {
-      connDiv.innerHTML = '<div class="discover-loading">No connectors found</div>';
+      connDiv.innerHTML = '<div class="discover-loading">' + t("discover-no-connectors-found") + '</div>';
       return;
     }
     connDiv.innerHTML = rowsHtml;
@@ -329,7 +337,7 @@ function toggleStation(groupKey) {
 
 function renderConnectorRow(c, cpoKey, chargerId) {
   var statusCls = STATUS_CLASSES[c.status] || "status-unknown";
-  var statusLabel = STATUS_LABELS[c.status] || c.status;
+  var statusLabel = statusLabelFor(c.status);
   // rawStatus is only set when a provider sends a status code we can't map
   // (see evcharge.js) — show it for visibility. A literal "UNKNOWN" status
   // (e.g. Electromaps reporting it lost live data for a connector) has no
@@ -342,7 +350,7 @@ function renderConnectorRow(c, cpoKey, chargerId) {
   var isPending = !alreadyAdded && isConnectorPending(chargerId, String(c.id));
   return '<div class="discover-connector' + (alreadyAdded ? ' discover-connector-added' : '') + '">' +
     '<input type="checkbox" class="s-checkbox pin-checkbox"' +
-      (alreadyAdded ? ' checked disabled title="Already added to My Stations"' : (isPending ? ' checked' : '')) +
+      (alreadyAdded ? ' checked disabled title="' + esc(t("discover-already-added")) + '"' : (isPending ? ' checked' : '')) +
       ' data-conn-id="' + esc(c.id) + '"' +
       ' data-charger-id="' + esc(chargerId) + '"' +
       ' data-display-name="' + esc(displayName) + '">' +
@@ -364,8 +372,7 @@ function updateAddButton() {
     btn.style.display = "none";
   } else {
     btn.style.display = "block";
-    var n = pendingPins.length;
-    btn.textContent = "Add " + n + " connector" + (n !== 1 ? "s" : "") + " to My Stations";
+    btn.textContent = t("discover-add-button", { count: pendingPins.length });
   }
 }
 

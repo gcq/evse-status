@@ -48,6 +48,28 @@ var STATUS_CLASSES = {
   UNKNOWN:                "status-unknown"
 };
 
+// Layers translation (via l10n.js's t(), used by app.js and discover.js) on
+// top of the English STATUS_LABELS map above, falling back to English if a
+// status code has no message (e.g. a status this app hasn't seen yet).
+var STATUS_MESSAGE_IDS = {
+  AVAILABLE:              "status-available",
+  PREPARING:              "status-preparing",
+  OCCUPIED:               "status-occupied",
+  CONNECTED_NOT_CHARGING: "status-connected",
+  FINISHING:              "status-finishing",
+  RESERVED:               "status-reserved",
+  OUT_OF_SERVICE:         "status-out-of-service",
+  WORKING:                "status-working",
+  UNKNOWN:                "status-unknown"
+};
+
+function statusLabelFor(code) {
+  var id = STATUS_MESSAGE_IDS[code];
+  if (!id) return STATUS_LABELS[code] || code;
+  var label = t(id);
+  return label !== id ? label : (STATUS_LABELS[code] || code);
+}
+
 var LOCATIONS = [
   {
     id: "42479",

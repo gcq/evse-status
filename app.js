@@ -88,38 +88,44 @@ function renderLimitBadge(limit) {
       lines.push(timeStr + kwh);
     }
     return '<div class="limit-badge-wrap">' +
-      '<span class="limit-badge limit-overdue">Should leave now</span>' +
+      '<span class="limit-badge limit-overdue">' + t("limit-should-leave-now") + '</span>' +
       lines.map(function(l) { return '<span class="limit-detail">' + l + '</span>'; }).join("") +
     '</div>';
   }
 
+  // h/m units aren't translated — they're passed as a pre-formatted duration
+  // argument so each locale's message can still control word order around it
+  // (e.g. "ago"/"in" trail in English but lead as "hace"/"fa"/"en" in
+  // Spanish/Catalan).
   var remaining = limit.deadline - Date.now();
   if (remaining <= 0) {
     var overdueMins = Math.floor(-remaining / 60000);
     var overdueHours = Math.floor(overdueMins / 60);
     overdueMins = overdueMins % 60;
-    var overdueText = overdueHours > 0
-      ? "Should have left " + overdueHours + "h " + (overdueMins < 10 ? "0" : "") + overdueMins + "m ago"
-      : "Should have left " + overdueMins + "m ago";
+    var overdueDuration = overdueHours > 0
+      ? overdueHours + "h " + (overdueMins < 10 ? "0" : "") + overdueMins + "m"
+      : overdueMins + "m";
+    var overdueText = t("limit-should-have-left", { duration: overdueDuration });
     return '<span class="limit-badge limit-overdue">' + overdueText + '</span>';
   }
   var mins = Math.floor(remaining / 60000);
   var hours = Math.floor(mins / 60);
   mins = mins % 60;
-  var text = hours > 0
-    ? "Should leave in " + hours + "h " + (mins < 10 ? "0" : "") + mins + "m"
-    : "Should leave in " + mins + "m";
+  var duration = hours > 0
+    ? hours + "h " + (mins < 10 ? "0" : "") + mins + "m"
+    : mins + "m";
+  var text = t("limit-should-leave-in", { duration: duration });
   var cls = remaining < 30 * 60000 ? "limit-urgent" : "limit-ok";
   return '<span class="limit-badge ' + cls + '">' + text + '</span>';
 }
 
 function formatRelativeTime(isoString) {
-  if (!isoString) return "unknown";
+  if (!isoString) return t("relative-time-unknown");
   var diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
-  if (diff < 60) return diff + "s ago";
-  if (diff < 3600) return Math.floor(diff / 60) + "m ago";
-  if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
-  return Math.floor(diff / 86400) + "d ago";
+  if (diff < 60) return t("relative-time-ago", { n: diff, unit: "s" });
+  if (diff < 3600) return t("relative-time-ago", { n: Math.floor(diff / 60), unit: "m" });
+  if (diff < 86400) return t("relative-time-ago", { n: Math.floor(diff / 3600), unit: "h" });
+  return t("relative-time-ago", { n: Math.floor(diff / 86400), unit: "d" });
 }
 
 function getAdapter(cpo) {
@@ -235,7 +241,7 @@ async function fetchLocation(locConfig, signal) {
     updatedAt: primaryData.updatedAt,
     rules: locConfig.rules || null,
     error: null,
-    warning: anySiblingFailed ? "Some connectors may be unavailable right now" : null,
+    warning: anySiblingFailed ? t("addr-partial-warning") : null,
     connectors: mergedConnectors.map(function(c) {
       return Object.assign({}, c, {
         displayName: displayNameMap[c.id] || c.visualRef || c.id
@@ -246,10 +252,10 @@ async function fetchLocation(locConfig, signal) {
 
 function renderConnector(connector, context, isOos) {
   var statusClass = STATUS_CLASSES[connector.status] || "status-unknown";
-  var statusLabel = esc(STATUS_LABELS[connector.status] || connector.status);
+  var statusLabel = esc(statusLabelFor(connector.status));
   var typeLabel = esc(CONNECTOR_TYPE_LABELS[connector.type] || connector.type);
   var notLive = connector.realtime === false
-    ? '<span class="not-live" title="Status not updated in real time">not live</span>'
+    ? '<span class="not-live" title="' + esc(t("connector-not-live-title")) + '">' + esc(t("connector-not-live")) + '</span>'
     : "";
 
   var limitBadgesHtml = "";
@@ -313,7 +319,7 @@ function renderCardBody(location, index, connectors, headerButtonsHtml, extraCla
     '<div class="card-header">' +
       headerButtonsHtml +
       '<span class="location-name">' + esc(location.displayName) + '</span>' +
-      '<span class="cpo-badge">' + esc(location.cpo || "Unknown") + '</span>' +
+      '<span class="cpo-badge">' + esc(location.cpo || t("status-unknown")) + '</span>' +
     '</div>' +
     renderAddressLine(location, index) +
     '<div class="connectors">' + connectorsHtml + '</div>' +
@@ -335,16 +341,16 @@ function renderCard(location, index) {
   if (active.length === 0) return '';
 
   var refreshBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '" title="Refresh this location" aria-label="Refresh this location">' + ICONS.refresh + '</button>'
+    ? '<button class="btn btn-ghost btn-icon refresh-loc-btn" data-loc-index="' + index + '" title="' + esc(t("btn-refresh-location")) + '" aria-label="' + esc(t("btn-refresh-location")) + '">' + ICONS.refresh + '</button>'
     : '';
 
   var isAutoOnly = index != null && window.LOCATIONS[index] && window.LOCATIONS[index].autoRefresh;
   var autoBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="Auto-refresh only this location" aria-label="Auto-refresh only this location">' + ICONS.auto + '</button>'
+    ? '<button class="btn btn-ghost btn-icon auto-refresh-loc-btn' + (isAutoOnly ? ' active' : '') + '" data-loc-index="' + index + '" title="' + esc(t("btn-auto-refresh-location")) + '" aria-label="' + esc(t("btn-auto-refresh-location")) + '">' + ICONS.auto + '</button>'
     : '';
 
   var hideBtn = index != null
-    ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="Hide this location" aria-label="Hide this location">' + ICONS.eye + '</button>'
+    ? '<button class="btn btn-ghost btn-icon hide-loc-btn" data-loc-index="' + index + '" title="' + esc(t("btn-hide-location")) + '" aria-label="' + esc(t("btn-hide-location")) + '">' + ICONS.eye + '</button>'
     : '';
 
   return renderCardBody(location, index, active, refreshBtn + autoBtn + hideBtn);
@@ -361,12 +367,13 @@ function renderAddressLine(location, index) {
   // distance/updated phrases are wrapped as a single atomic unit so e.g.
   // "Updated" and "5m ago" don't get split across lines.
   if (location.address) parts.push(esc(location.address));
-  if (distM != null) parts.push('<span class="addr-atom">' + formatDistance(distM) + " away</span>");
+  if (distM != null) parts.push('<span class="addr-atom">' + t("addr-away", { distance: formatDistance(distM) }) + '</span>');
   if (updateFailed) {
-    parts.push('<span class="addr-atom last-updated-failed">Last update failed</span>');
+    parts.push('<span class="addr-atom last-updated-failed">' + t("addr-update-failed") + '</span>');
   } else if (lastUpdated) {
-    parts.push('<span class="addr-atom">Updated <span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
-      formatRelativeTime(lastUpdated) + '</span></span>');
+    var liveTimeSpan = '<span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
+      formatRelativeTime(lastUpdated) + '</span>';
+    parts.push('<span class="addr-atom">' + t("addr-updated", { time: liveTimeSpan }) + '</span>');
   }
   // Soft signal for a merged multi-charger location where one sibling
   // charger's fetch failed but others succeeded — not the hard red
@@ -385,7 +392,7 @@ function tickLastUpdatedTexts() {
 }
 
 function renderHiddenCard(location, index) {
-  var unhideBtn = '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="Show this location" aria-label="Show this location">' + ICONS.eyeOff + '</button>';
+  var unhideBtn = '<button class="btn btn-ghost btn-icon unhide-loc-btn" data-loc-index="' + index + '" title="' + esc(t("btn-show-location")) + '" aria-label="' + esc(t("btn-show-location")) + '">' + ICONS.eyeOff + '</button>';
 
   return renderCardBody(location, index, activeConnectors(location), unhideBtn);
 }
@@ -408,7 +415,7 @@ function renderCollapsedSection(elId, title, filterFn, renderItemFn) {
 }
 
 function renderHiddenSection() {
-  renderCollapsedSection("hidden-section", "Hidden", function(r, i) {
+  renderCollapsedSection("hidden-section", t("section-hidden"), function(r, i) {
     return LOCATIONS[i] && LOCATIONS[i].hidden;
   }, renderHiddenCard);
 }
@@ -464,7 +471,7 @@ function renderOutOfRangeCard(location, index) {
 }
 
 function renderOutOfRangeSection() {
-  renderCollapsedSection("out-of-range-section", "Out of range", function(r, i) {
+  renderCollapsedSection("out-of-range-section", t("section-out-of-range"), function(r, i) {
     return LOCATIONS[i] && !LOCATIONS[i].hidden && isOutOfRange(i);
   }, renderOutOfRangeCard);
 }
@@ -494,7 +501,7 @@ function renderOosCard(location, index) {
 }
 
 function renderOosSection() {
-  renderCollapsedSection("oos-section", "Out of service", function(r) {
+  renderCollapsedSection("oos-section", t("section-out-of-service"), function(r) {
     return r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; });
   }, renderOosCard);
 }
@@ -503,7 +510,7 @@ function setLoading(isLoading) {
   var btn = document.getElementById("refresh-btn");
   btn.disabled = isLoading;
   if (isLoading) {
-    btn.textContent = "Refreshing…";
+    btn.textContent = t("refresh-loading");
   } else {
     updateRefreshUI();
   }
@@ -515,13 +522,13 @@ function updateRefreshUI() {
   var btn = document.getElementById("refresh-btn");
   if (btn && !btn.disabled) {
     if (globalEnabled) {
-      btn.textContent = "Auto refresh active";
+      btn.textContent = t("refresh-active");
       btn.className = "mode-all";
     } else if (LOCATIONS.some(function(loc) { return loc.autoRefresh; })) {
-      btn.textContent = "Selective refresh active";
+      btn.textContent = t("refresh-selective");
       btn.className = "mode-selective";
     } else {
-      btn.textContent = "Auto refresh disabled";
+      btn.textContent = t("refresh-off");
       btn.className = "mode-off";
     }
   }
@@ -534,7 +541,7 @@ function updateRefreshUI() {
     if (el) {
       el.textContent = countdown;
     } else {
-      label.innerHTML = 'Next refresh in <span id="countdown">' + countdown + '</span>s';
+      label.innerHTML = t("countdown-prefix") + ' <span id="countdown">' + countdown + '</span>s';
     }
     label.style.display = "";
   } else {
@@ -563,19 +570,19 @@ function updateGpsStatusUI() {
     el.style.display = "inline-block";
     if (staleMs >= GPS_FIX_FRESH_MS) {
       el.classList.add("gps-stale");
-      el.textContent = "Stale location";
+      el.textContent = t("gps-stale");
     } else {
       el.classList.add("gps-fixed");
-      el.textContent = "Live location";
+      el.textContent = t("gps-live");
     }
   } else if (gpsStatus === "unavailable") {
     el.style.display = "inline-block";
     el.classList.add("gps-unavailable");
-    el.textContent = "Location unavailable";
+    el.textContent = t("gps-unavailable");
   } else {
     el.style.display = "inline-block";
     el.classList.add("gps-searching");
-    el.textContent = "Locating…";
+    el.textContent = t("gps-locating");
   }
 }
 
@@ -768,7 +775,7 @@ async function refresh() {
 
   if (LOCATIONS.length === 0) {
     document.getElementById("cards").innerHTML =
-      '<p class="s-hint" style="text-align:center;padding:32px">No locations configured — add one in Settings</p>';
+      '<p class="s-hint" style="text-align:center;padding:32px">' + t("empty-state") + '</p>';
     setLoading(false);
     return;
   }
@@ -811,8 +818,16 @@ async function refresh() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", async function() {
+  await initL10n();
   renderDeployInfo("deploy-info");
+  document.documentElement.lang = l10nActiveLocale;
+  document.title = t("header-title");
+  var h1 = document.querySelector("header h1");
+  if (h1) h1.textContent = t("header-title");
+  var settingsLink = document.getElementById("settings-link");
+  if (settingsLink) settingsLink.textContent = t("nav-settings");
+
   var cfg = getConfig();
   if (cfg) {
     if (cfg.handedness) HANDEDNESS = cfg.handedness;

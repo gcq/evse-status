@@ -5,11 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EVSE Status</title>
   <link rel="stylesheet" href="style.css">
+  <script src="util.js"></script>
+  <script src="l10n.js"></script>
   <script>
     try {
-      var t = (JSON.parse(localStorage.getItem("evse_config")) || {}).theme;
-      document.documentElement.setAttribute("data-theme", t || "auto");
+      var savedTheme = (JSON.parse(localStorage.getItem("evse_config")) || {}).theme;
+      document.documentElement.setAttribute("data-theme", savedTheme || "auto");
     } catch (e) { document.documentElement.setAttribute("data-theme", "auto"); }
+    // Synchronous, so <html lang> is right from first paint — the visible
+    // text still flashes English until initL10n()'s network round trip
+    // finishes (see l10n.js), but assistive tech and language-sensitive
+    // rendering (quotes, hyphenation) get the right locale immediately.
+    document.documentElement.lang = detectLocale();
   </script>
 </head>
 <body>
@@ -17,7 +24,7 @@
     <h1>EVSE Status</h1>
     <div class="header-controls">
       <button id="refresh-btn" type="button">Auto refresh active</button>
-      <a href="settings.html" class="btn btn-secondary">Settings</a>
+      <a href="settings.html" class="btn btn-secondary" id="settings-link">Settings</a>
       <span class="countdown-label" id="countdown-label">Next refresh in <span id="countdown">60</span>s</span>
       <span class="gps-status-label" id="gps-status-label"></span>
     </div>
@@ -29,7 +36,6 @@
   <footer><a id="deploy-info" class="deploy-info" target="_blank" rel="noopener"></a></footer>
 
   <script src="config.js"></script>
-  <script src="util.js"></script>
   <script src="adapters/electromaps.js"></script>
   <script src="adapters/evcharge.js"></script>
   <script src="app.js"></script>
