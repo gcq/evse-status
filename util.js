@@ -49,3 +49,21 @@ function esc(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
+
+// Pages deploys straight from `main` with no build step, and deploys have
+// been failing often enough that "what's live" can silently lag `main` —
+// this surfaces the actual deployed commit so that's visible at a glance
+// instead of having to check GitHub's Environments tab.
+function renderDeployInfo(elId) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  fetch("https://api.github.com/repos/gcq/evse-status/deployments?environment=github-pages&per_page=1")
+    .then(function(r) { return r.ok ? r.json() : null; })
+    .then(function(deployments) {
+      if (!deployments || !deployments.length) return;
+      var sha = deployments[0].sha;
+      el.textContent = "Deployed " + sha.slice(0, 7);
+      el.href = "https://github.com/gcq/evse-status/commit/" + sha;
+    })
+    .catch(function() { /* offline/rate-limited — leave the footer blank */ });
+}

@@ -9,6 +9,7 @@ function swapInPlace(arr, i, j) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 
 function init() {
+  renderDeployInfo("deploy-info");
   state = loadConfig();
   render();
   document.getElementById("save-btn").addEventListener("click", save);

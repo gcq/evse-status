@@ -791,6 +791,7 @@ async function refresh() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+  renderDeployInfo("deploy-info");
   var cfg = getConfig();
   if (cfg) {
     if (cfg.handedness) HANDEDNESS = cfg.handedness;
