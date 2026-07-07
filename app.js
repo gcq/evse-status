@@ -162,6 +162,13 @@ async function fetchLocation(locConfig, signal) {
       if (currentPosition) computeDistances();
     }
 
+    // TODO(remove): same migration shim as above, for address — safe to
+    // delete once existing users' configs have all been backfilled once.
+    if (locConfig.address == null && data.address != null) {
+      locConfig.address = data.address;
+      persistLocations();
+    }
+
     return {
       displayName: locConfig.displayName,
       id: data.id,
@@ -202,6 +209,11 @@ async function fetchLocation(locConfig, signal) {
     locConfig.lon = primaryData.lon;
     persistLocations();
     if (currentPosition) computeDistances();
+  }
+
+  if (locConfig.address == null && primaryData.address != null) {
+    locConfig.address = primaryData.address;
+    persistLocations();
   }
 
   var mergedConnectors = [];

@@ -171,6 +171,7 @@ function buildLocation(loc, li) {
       staticField("CPO", cpoLabel(loc.cpo)) +
       staticField("Location ID", loc.id, { hint: mergedChargerHint(loc) }) +
       staticField("Coordinates", coords) +
+      staticField("Address", loc.address || "—") +
     '</div>' +
 
     '<h4 class="s-subsection-title">Rules</h4>' +

@@ -309,6 +309,7 @@ function toggleStation(groupKey) {
             cpoKey: group.cpoKey,
             chargerId: chargerId,
             stationName: group.name,
+            address: group.address,
             lat: group.lat,
             lon: group.lon,
             groupMembers: group.members.map(function(m) { return m.id; }), // already sorted by computeStationGroups
@@ -431,6 +432,7 @@ function pinSelected() {
         id: primaryId,
         cpo: pin.cpoKey,
         displayName: pin.stationName,
+        address: pin.address != null ? pin.address : null,
         lat: pin.lat != null ? pin.lat : null,
         lon: pin.lon != null ? pin.lon : null,
         rules: null,
