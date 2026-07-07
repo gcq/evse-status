@@ -127,6 +127,13 @@ h1 {
   white-space: nowrap;
 }
 
+.gps-status-label {
+  display: none;
+  font-size: 14px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* Fixed width so changing digits don't shift the layout */
 #countdown {
   display: inline-block;

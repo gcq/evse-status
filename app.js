@@ -25,6 +25,8 @@ var locationOrder = "config"; // "config" (default) or "distance" — opt-in via
 var maxDistanceKm = null;
 var currentPosition = null;   // { lat, lon } once geolocation resolves, else null
 var locationDistances = [];   // meters, parallel to LOCATIONS; null = unknown
+var gpsStatus = "locating";   // "locating" | "fixed" | "unavailable" — surfaced in the header
+var gpsFixAt = null;          // ISO timestamp of the last successful fix
 
 // "HH:MM"-"HH:MM" window, e.g. 22:00-08:00 crosses midnight — handled by
 // wrapping the comparison when start > end.
@@ -462,7 +464,20 @@ function renderOutOfRangeSection() {
 }
 
 function applyDistanceLayout() {
-  LOCATIONS.forEach(function(loc, i) { if (locationResults[i]) rerenderCardSlot(i); });
+  LOCATIONS.forEach(function(loc, i) {
+    if (locationResults[i]) {
+      rerenderCardSlot(i);
+      return;
+    }
+    // Still loading (no fetch result yet) — but distance alone is enough to
+    // know it belongs in the collapsed Out of range section, so hide its
+    // skeleton immediately instead of leaving it visible until its own
+    // fetch happens to finish (which made out-of-range cards disappear one
+    // at a time, staggered by fetch timing, instead of all together the
+    // moment the GPS fix landed).
+    var slot = document.getElementById("card-slot-" + i);
+    if (slot) slot.style.display = isOutOfRange(i) ? "none" : "";
+  });
   reorderCardsByDistance();
   renderOutOfRangeSection();
 }
@@ -518,6 +533,28 @@ function updateRefreshUI() {
     label.style.display = "";
   } else {
     label.style.display = "none";
+  }
+}
+
+// Shown only when the out-of-range cutoff is actually in play (distance
+// ordering + a max distance set) — otherwise GPS status isn't relevant to
+// anything on screen. Surfaces when the fix landed so a delay in cards
+// getting hidden can be told apart from "still waiting on GPS" vs. "GPS has
+// a fix and something else is slow."
+function updateGpsStatusUI() {
+  var el = document.getElementById("gps-status-label");
+  if (!el) return;
+  if (locationOrder !== "distance" || !maxDistanceKm) {
+    el.style.display = "none";
+    return;
+  }
+  el.style.display = "inline-block";
+  if (gpsStatus === "fixed") {
+    el.textContent = "Location fix " + formatRelativeTime(gpsFixAt);
+  } else if (gpsStatus === "unavailable") {
+    el.textContent = "Location unavailable";
+  } else {
+    el.textContent = "Locating…";
   }
 }
 
@@ -774,6 +811,7 @@ document.addEventListener("DOMContentLoaded", function() {
   document.body.setAttribute("data-theme", (cfg && cfg.theme) ? cfg.theme : "auto");
 
   updateRefreshUI();
+  updateGpsStatusUI();
 
   document.getElementById("cards").addEventListener("click", function(e) {
     var refreshBtn = e.target.closest(".refresh-loc-btn");
@@ -837,12 +875,23 @@ document.addEventListener("DOMContentLoaded", function() {
     navigator.geolocation.watchPosition(
       function(position) {
         currentPosition = { lat: position.coords.latitude, lon: position.coords.longitude };
+        gpsStatus = "fixed";
+        gpsFixAt = new Date().toISOString();
+        updateGpsStatusUI();
         computeDistances();
         applyDistanceLayout();
       },
-      function() { /* denied/unavailable — fall back to config order, no error shown */ },
+      function() {
+        // denied/unavailable — fall back to config order, no error shown
+        // beyond the header status label
+        gpsStatus = "unavailable";
+        updateGpsStatusUI();
+      },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 60000 }
     );
+  } else if (locationOrder === "distance") {
+    gpsStatus = "unavailable";
+    updateGpsStatusUI();
   }
 
   // Ticks on a fixed schedule anchored to page load, independent of when any
@@ -852,7 +901,10 @@ document.addEventListener("DOMContentLoaded", function() {
   // where in the cycle the refresh happened to land — a shorter period
   // bounds that worst case tightly without needing per-refresh realignment.
   setInterval(function() {
-    if (!document.hidden) tickLastUpdatedTexts();
+    if (!document.hidden) {
+      tickLastUpdatedTexts();
+      if (gpsStatus === "fixed") updateGpsStatusUI();
+    }
   }, 250);
 
   refresh();
