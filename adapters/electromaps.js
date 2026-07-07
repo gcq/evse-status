@@ -39,8 +39,8 @@ ADAPTERS.electromaps = {
     });
   },
 
-  async fetchLocation(locationId, connectorIds) {
-    var resp = await fetch(this.BASE_URL + "/locations/" + locationId);
+  async fetchLocation(locationId, connectorIds, signal) {
+    var resp = await fetch(this.BASE_URL + "/locations/" + locationId, { signal: signal });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     var data = await resp.json();
 

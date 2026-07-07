@@ -1,4 +1,5 @@
 var REFRESH_INTERVAL = 60;  // seconds
+var FETCH_TIMEOUT_MS = 10000; // drop a location's refresh if it takes longer than this
 var refreshTimer = null;
 var countdown = REFRESH_INTERVAL;
 var countdownTimer = null;
@@ -10,6 +11,14 @@ var missedRefreshWhileHidden = false;
 var refreshDeadlineMs = null;
 var locationResults = [];
 var locationLastUpdated = []; // ISO timestamp per location, set on each successful fetch
+var locationUpdateFailed = []; // true when the most recent refresh timed out, parallel to locationResults
+
+// WebKit's fetch() rejects aborted requests with a generic AbortError rather
+// than surfacing the signal's abort reason (Chrome/Firefox do) — so timeout
+// detection has to check the signal itself, not the caught error's name.
+function isTimeoutSignal(signal) {
+  return !!(signal && signal.aborted && signal.reason && signal.reason.name === "TimeoutError");
+}
 
 var locationOrder = "config"; // "config" (default) or "distance" — opt-in via Settings
 var maxDistanceKm = null;
@@ -123,7 +132,7 @@ function uniq(arr) {
 
 // locConfig.id is really a Charger id, not a Location id (see MODEL(hierarchy)
 // note in config.js) — merges every charger under locConfig's connectors.
-async function fetchLocation(locConfig) {
+async function fetchLocation(locConfig, signal) {
   var adapter = getAdapter(locConfig.cpo);
   if (!adapter) throw new Error("No adapter for CPO: " + locConfig.cpo);
 
@@ -137,7 +146,8 @@ async function fetchLocation(locConfig) {
     // ── Single-charger location: today's exact behavior, unchanged. ────────
     var data = await adapter.fetchLocation(
       locConfig.id,
-      locConfig.connectors.map(function(c) { return c.id; })
+      locConfig.connectors.map(function(c) { return c.id; }),
+      signal
     );
 
     // TODO(remove): migration shim only, for locations pinned before lat/lon
@@ -174,7 +184,7 @@ async function fetchLocation(locConfig) {
     var wanted = locConfig.connectors
       .filter(function(c) { return (c.chargerId || locConfig.id) === cid; })
       .map(function(c) { return c.id; });
-    return adapter.fetchLocation(cid, wanted);
+    return adapter.fetchLocation(cid, wanted, signal);
   }));
 
   var primaryIdx = chargerIds.indexOf(locConfig.id);
@@ -328,10 +338,13 @@ function renderCard(location, index) {
 function renderAddressLine(location, index) {
   var distM = index != null ? locationDistances[index] : null;
   var lastUpdated = index != null ? locationLastUpdated[index] : null;
+  var updateFailed = index != null && locationUpdateFailed[index];
   var parts = [];
   if (location.address) parts.push(esc(location.address));
   if (distM != null) parts.push(formatDistance(distM) + " away");
-  if (lastUpdated) {
+  if (updateFailed) {
+    parts.push('<span class="last-updated-failed">Last update failed</span>');
+  } else if (lastUpdated) {
     parts.push('Updated <span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
       formatRelativeTime(lastUpdated) + '</span>');
   }
@@ -590,12 +603,31 @@ async function autoRefreshTick() {
 // need to know when this location is done, not whether it succeeded.
 async function fetchAndRenderLocation(i) {
   var loc = window.LOCATIONS[i];
+  var hadPriorResult = !!(locationResults[i] && !locationResults[i].error);
+  var signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   var result;
+  var timedOut = false;
   try {
-    result = await fetchLocation(loc);
+    result = await fetchLocation(loc, signal);
     locationLastUpdated[i] = new Date().toISOString();
+    locationUpdateFailed[i] = false;
   } catch (e) {
-    result = { displayName: loc.displayName, id: loc.id, error: e.message, connectors: [] };
+    if (isTimeoutSignal(signal) && hadPriorResult) {
+      // The request was actually cancelled at the network level (not just
+      // ignored) — keep showing the last-known-good card data (dimmed, as if
+      // still loading) instead of replacing it with an error.
+      timedOut = true;
+      locationUpdateFailed[i] = true;
+      result = locationResults[i];
+    } else {
+      result = {
+        displayName: loc.displayName,
+        id: loc.id,
+        error: isTimeoutSignal(signal) ? "Update timed out" : e.message,
+        connectors: []
+      };
+      locationUpdateFailed[i] = false;
+    }
   }
   locationResults[i] = result;
 
@@ -604,7 +636,7 @@ async function fetchAndRenderLocation(i) {
     var html = renderCard(result, i);
     slot.innerHTML = html;
     slot.style.display = html ? "" : "none";
-    slot.style.opacity = "";
+    slot.style.opacity = timedOut ? "0.5" : "";
   }
 
   renderOosSection();

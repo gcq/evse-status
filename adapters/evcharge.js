@@ -101,23 +101,27 @@ ADAPTERS.evcharge = {
       });
   },
 
-  async fetchSocketTiming(chargerId, socketNumber) {
+  async fetchSocketTiming(chargerId, socketNumber, signal) {
     var url = this.BASE_URL + "/api/v1/etecnic/socket/status" +
       "?idcharger=" + chargerId + "&socket=" + socketNumber +
       "&token_user=" + this.GUEST_TOKEN;
     try {
-      var resp = await fetch(url, { headers: this.HEADERS });
+      var resp = await fetch(url, { headers: this.HEADERS, signal: signal });
       if (!resp.ok) return null;
       return await resp.json();
     } catch (e) {
+      // A timed-out signal should fail the whole location fetch (same as the
+      // main request), not silently degrade to missing session timing —
+      // everything else here (HTTP errors, network errors) stays swallowed.
+      if (signal && signal.aborted) throw e;
       return null;
     }
   },
 
-  async fetchLocation(locationId, connectorIds) {
+  async fetchLocation(locationId, connectorIds, signal) {
     var url = this.BASE_URL + "/api/v1/etecnic/charger/show/" + locationId +
               "?new_api=true&token_user=" + this.GUEST_TOKEN;
-    var resp = await fetch(url, { headers: this.HEADERS });
+    var resp = await fetch(url, { headers: this.HEADERS, signal: signal });
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     var data = await resp.json();
     if (data.error_code) throw new Error("EVcharge error " + data.error_code + ": " + data.status_message);
@@ -131,7 +135,7 @@ ADAPTERS.evcharge = {
     // Fetch timing in parallel for charging sockets only
     var timingPromises = sockets.map(function(s) {
       return String(s.id_status) === "1"
-        ? self.fetchSocketTiming(data.id_charger, s.socket_number)
+        ? self.fetchSocketTiming(data.id_charger, s.socket_number, signal)
         : Promise.resolve(null);
     });
     var timings = await Promise.all(timingPromises);
