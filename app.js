@@ -355,19 +355,25 @@ function renderAddressLine(location, index) {
   var lastUpdated = index != null ? locationLastUpdated[index] : null;
   var updateFailed = index != null && locationUpdateFailed[index];
   var parts = [];
+  // Address/warning are unbounded-length text — left able to wrap normally
+  // instead of forced onto one line, since a long one could otherwise
+  // overflow the card (which clips instead of scrolling). The short
+  // distance/updated phrases are wrapped as a single atomic unit so e.g.
+  // "Updated" and "5m ago" don't get split across lines.
   if (location.address) parts.push(esc(location.address));
-  if (distM != null) parts.push(formatDistance(distM) + " away");
+  if (distM != null) parts.push('<span class="addr-atom">' + formatDistance(distM) + " away</span>");
   if (updateFailed) {
-    parts.push('<span class="last-updated-failed">Last update failed</span>');
+    parts.push('<span class="addr-atom last-updated-failed">Last update failed</span>');
   } else if (lastUpdated) {
-    parts.push('Updated <span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
-      formatRelativeTime(lastUpdated) + '</span>');
+    parts.push('<span class="addr-atom">Updated <span class="last-updated-text" data-updated-at="' + lastUpdated + '">' +
+      formatRelativeTime(lastUpdated) + '</span></span>');
   }
   // Soft signal for a merged multi-charger location where one sibling
   // charger's fetch failed but others succeeded — not the hard red
   // card-error state, since most of the location is still showing live data.
   if (location.warning) parts.push('<span class="location-warning">' + esc(location.warning) + '</span>');
-  return parts.length ? '<div class="location-address">' + parts.join(" · ") + '</div>' : '';
+  var joined = parts.join(" · ");
+  return parts.length ? '<div class="location-address">' + joined + '</div>' : '';
 }
 
 // Ticks the "Updated Xs ago" text on every card without a full re-render,

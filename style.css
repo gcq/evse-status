@@ -767,6 +767,10 @@ body.left-handed .card-header .location-name        { text-align: right; }
   padding: 0 20px 12px;
 }
 
+.addr-atom {
+  white-space: nowrap;
+}
+
 .location-warning {
   color: var(--orange);
 }
