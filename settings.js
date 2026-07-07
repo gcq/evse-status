@@ -137,7 +137,7 @@ function buildGlobal() {
         ], state.handedness || "right") +
         '<span class="s-hint">' + t("driving-side-hint") + '</span>' +
       '</div>' +
-      '<div class="s-field">' +
+      '<div class="s-field s-field-language">' +
         '<label class="s-label">' + t("field-language") + '</label>' +
         segmentedControl("g-language", [
           { value: "auto", label: t("language-auto") },

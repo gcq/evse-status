@@ -414,6 +414,15 @@ h1 {
   transition: background-color 0.2s, color 0.2s;
 }
 
+/* Its 4 full-word options ("Auto"/"English"/"Español"/"Català") need more
+   room than the other fields' 2-3 short words — a larger min-width means
+   the whole field drops to its own row (the existing .s-field-row wrap
+   already does this) once it doesn't fit, instead of its buttons getting
+   squeezed down to an ellipsis. */
+.s-field-row > .s-field-language {
+  min-width: 320px;
+}
+
 .s-segment.active {
   background: var(--accent);
   color: #fff;
