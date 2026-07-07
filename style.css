@@ -298,7 +298,8 @@ h1 {
 }
 
 .s-field-row > .s-static {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .s-static {
@@ -322,7 +323,8 @@ h1 {
 
 .s-static-value {
   font-size: 14px;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
   color: var(--text-primary);
 }
 
