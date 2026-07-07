@@ -542,24 +542,39 @@ function updateRefreshUI() {
   }
 }
 
+var GPS_FIX_FRESH_MS = 15000; // how long a fix counts as "live" before it's flagged stale
+
 // Shown only when the out-of-range cutoff is actually in play (distance
-// ordering + a max distance set) — otherwise GPS status isn't relevant to
-// anything on screen. Surfaces when the fix landed so a delay in cards
-// getting hidden can be told apart from "still waiting on GPS" vs. "GPS has
-// a fix and something else is slow."
+// ordering + a max distance set) — that's the only time cards' visibility
+// depends on GPS, so it's the only time staleness is worth surfacing. Once
+// a fix ages past GPS_FIX_FRESH_MS it's flagged "Stale" rather than hidden,
+// since a stale fix is exactly when the out-of-range cutoff is most likely
+// to be wrong.
 function updateGpsStatusUI() {
   var el = document.getElementById("gps-status-label");
   if (!el) return;
+  el.classList.remove("gps-fixed", "gps-stale", "gps-searching", "gps-unavailable");
   if (locationOrder !== "distance" || !maxDistanceKm) {
     el.style.display = "none";
     return;
   }
-  el.style.display = "inline-block";
   if (gpsStatus === "fixed") {
-    el.textContent = "Location fix " + formatRelativeTime(gpsFixAt);
+    var staleMs = Date.now() - new Date(gpsFixAt).getTime();
+    el.style.display = "inline-block";
+    if (staleMs >= GPS_FIX_FRESH_MS) {
+      el.classList.add("gps-stale");
+      el.textContent = "Stale location";
+    } else {
+      el.classList.add("gps-fixed");
+      el.textContent = "Live location";
+    }
   } else if (gpsStatus === "unavailable") {
+    el.style.display = "inline-block";
+    el.classList.add("gps-unavailable");
     el.textContent = "Location unavailable";
   } else {
+    el.style.display = "inline-block";
+    el.classList.add("gps-searching");
     el.textContent = "Locating…";
   }
 }

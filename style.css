@@ -136,9 +136,26 @@ h1 {
 
 .gps-status-label {
   display: none;
-  font-size: 14px;
-  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
+  border-radius: 4px;
+  padding: 4px 10px;
+}
+
+.gps-status-label.gps-searching,
+.gps-status-label.gps-unavailable {
+  color: var(--text-secondary);
+}
+
+.gps-status-label.gps-fixed {
+  background: var(--finishing-bg);
+  color: var(--finishing-fg);
+}
+
+.gps-status-label.gps-stale {
+  background: var(--orange-bg);
+  color: var(--orange);
 }
 
 /* Fixed width so changing digits don't shift the layout */
