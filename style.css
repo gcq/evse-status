@@ -106,6 +106,13 @@ body.left-handed .header-controls {
   flex-direction: row-reverse;
 }
 
+/* When header wraps to two lines, space-between shoves the lone item on
+   each line to the row-reverse main-start (the right edge) — force it left.
+   (Left-handed mode uses row, not row-reverse, so it's already left-aligned.) */
+@media (max-width: 480px) {
+  body:not(.left-handed) header { justify-content: flex-end; }
+}
+
 h1 {
   font-size: 22px;
   font-weight: 500;
