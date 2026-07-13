@@ -467,7 +467,10 @@ function reorderCardsByDistance() {
 }
 
 function renderOutOfRangeCard(location, index) {
-  return renderCardBody(location, index, activeConnectors(location), '');
+  // Shows every connector, OOS included: out-of-range "wins" over
+  // out-of-service, so a location that's both isn't split across two
+  // sections — it lives here alone, OOS status and all.
+  return renderCardBody(location, index, location.connectors, '');
 }
 
 function renderOutOfRangeSection() {
@@ -501,8 +504,10 @@ function renderOosCard(location, index) {
 }
 
 function renderOosSection() {
-  renderCollapsedSection("oos-section", t("section-out-of-service"), function(r) {
-    return r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; });
+  renderCollapsedSection("oos-section", t("section-out-of-service"), function(r, i) {
+    // Out-of-range locations are excluded here even if they have OOS
+    // connectors — those show up in the out-of-range section instead.
+    return !isOutOfRange(i) && r.connectors.some(function(c) { return c.status === "OUT_OF_SERVICE"; });
   }, renderOosCard);
 }
 
@@ -665,7 +670,7 @@ async function autoRefreshTick() {
   }
 
   var targets = [];
-  LOCATIONS.forEach(function(loc, i) { if (loc.autoRefresh) targets.push(i); });
+  LOCATIONS.forEach(function(loc, i) { if (loc.autoRefresh && !isOutOfRange(i)) targets.push(i); });
   if (targets.length === 0) {
     scheduleNextRefresh();
     return;
@@ -783,6 +788,21 @@ async function refresh() {
   var container = document.getElementById("cards");
   var isFirstLoad = !document.getElementById("card-slot-0");
 
+  // First load fetches every location once (you need the info now, even for
+  // out-of-range ones) but dispatches in-range/unknown-distance locations
+  // first so they land before a slow network finishes the out-of-range ones.
+  // Subsequent automatic refreshes skip out-of-range locations entirely —
+  // their status is unlikely to have changed and it's not worth the
+  // request. Out-of-service doesn't factor in: an out-of-range+OOS location
+  // is still skipped, same as any other out-of-range one.
+  var indices = LOCATIONS.map(function(_, i) { return i; });
+  if (!isFirstLoad) {
+    indices = indices.filter(function(i) { return !isOutOfRange(i); });
+  }
+  indices.sort(function(a, b) { return isOutOfRange(a) - isOutOfRange(b); });
+  var willFetch = {};
+  indices.forEach(function(i) { willFetch[i] = true; });
+
   if (isFirstLoad) {
     // First load: render skeletons so the page isn't blank
     container.innerHTML = LOCATIONS.map(function(loc, i) {
@@ -790,7 +810,8 @@ async function refresh() {
       return '<div id="card-slot-' + i + '"' + style + '>' + renderCardSkeleton(loc) + '</div>';
     }).join("");
   } else {
-    // Re-refresh: ensure slots exist and dim existing cards to signal staleness
+    // Re-refresh: ensure slots exist and dim only the ones about to be
+    // re-fetched, so skipped out-of-range cards don't stay dimmed forever.
     LOCATIONS.forEach(function(loc, i) {
       var slot = document.getElementById("card-slot-" + i);
       if (!slot) {
@@ -798,13 +819,18 @@ async function refresh() {
         div.id = "card-slot-" + i;
         div.innerHTML = renderCardSkeleton(loc);
         container.appendChild(div);
-      } else {
+      } else if (willFetch[i]) {
         slot.style.opacity = "0.5";
       }
     });
   }
 
-  var pending = LOCATIONS.length;
+  var pending = indices.length;
+  if (pending === 0) {
+    setLoading(false);
+    scheduleNextRefresh();
+    return;
+  }
   function oneDone() {
     pending--;
     if (pending === 0) {
@@ -813,7 +839,7 @@ async function refresh() {
     }
   }
 
-  LOCATIONS.forEach(function(_, i) {
+  indices.forEach(function(i) {
     fetchAndRenderLocation(i).then(oneDone);
   });
 }
