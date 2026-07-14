@@ -1,7 +1,7 @@
 var ADAPTERS = window.ADAPTERS || {};
 
 ADAPTERS.evcharge = {
-  capabilities: ["CONNECTED_NOT_CHARGING", "SEARCH_NEARBY", "CHARGE_START_TIME"],
+  capabilities: ["CONNECTED_NOT_CHARGING", "SEARCH_NEARBY", "CHARGE_START_TIME", "REMOTE_START"],
 
   BASE_URL: "https://etecnic.net",
   GUEST_TOKEN: "bb4b5e862ff44ccdb6652c77c5a24c35",
@@ -101,6 +101,36 @@ ADAPTERS.evcharge = {
       });
   },
 
+  // Mirrors the app's own free-connector path (payments/create-payment with
+  // amount=0 — no Stripe confirmation step, see adapters/evcharge.md). Not
+  // called from the UI yet: the Start button that will use this is rendered
+  // disabled until this has been exercised against a real account.
+  // `account` is { userId, cardCode, email } from settings.
+  async startFreeCharge(account, socketId, chargingTime, chargingEnergy, priceTimeMin, priceEnergyKwh) {
+    var params = new URLSearchParams();
+    params.append("socketId", socketId);
+    params.append("cardCode", account.cardCode);
+    params.append("title", "AppPayment");
+    params.append("currency", "EUR"); // unconfirmed — app reads this from utils.CURRENCY_CODE, not seen live
+    params.append("paymentType", "STRIPE");
+    params.append("paymentToken", "");
+    params.append("paymentCapture", "false");
+    params.append("chargingTime", chargingTime || "");
+    params.append("chargingEnergy", chargingEnergy || "");
+    params.append("priceTimeMin", priceTimeMin || "");
+    params.append("priceEnergyKwh", priceEnergyKwh || "");
+    params.append("amount", "0");
+    params.append("stripeEmail", account.email);
+    params.append("userId", account.userId);
+
+    var url = this.BASE_URL + "/api/v1/etecnic/payments/create-payment?" + params.toString();
+    var resp = await fetch(url, { method: "POST", headers: this.HEADERS });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    var data = await resp.json();
+    if (data.error_code) throw new Error("EVcharge error " + data.error_code + ": " + data.status_message);
+    return data;
+  },
+
   async fetchSocketTiming(chargerId, socketNumber, signal) {
     var url = this.BASE_URL + "/api/v1/etecnic/socket/status" +
       "?idcharger=" + chargerId + "&socket=" + socketNumber +
@@ -171,7 +201,11 @@ ADAPTERS.evcharge = {
           sessionMinutes: mins > 0 ? mins : null,
           sessionEnergyWh: energyWh > 0 ? energyWh : null,
           sessionUserName: userName || null,
-          visualRef: "Socket " + s.socket_number
+          visualRef: "Socket " + s.socket_number,
+          // Empty rates == no charge rate configured on this socket == free to
+          // use (confirmed live: charger 10511/socket 27834 vs. paid sockets
+          // that carry a non-empty rates[] with a real €/kWh price_base).
+          isFree: !s.rates || s.rates.length === 0
         };
       })
     };

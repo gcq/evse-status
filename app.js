@@ -23,6 +23,13 @@ function isTimeoutSignal(signal) {
 
 var locationOrder = "config"; // "config" (default) or "distance" — opt-in via Settings
 var maxDistanceKm = null;
+// How close (meters) you need to be, per locationDistances, before a REMOTE_START
+// adapter's Start button appears on an available connector. 0 = disabled,
+// never show the button. Only ever satisfiable when Location order = Distance
+// is on (that's what starts the GPS watch below). Set from config.evcharge at
+// startup — see DOMContentLoaded.
+var startChargeMaxM = 10;
+var evchargeAccount = null; // { userId, cardCode, email } from config.evcharge, or null
 var currentPosition = null;   // { lat, lon } once geolocation resolves, else null
 var locationDistances = [];   // meters, parallel to LOCATIONS; null = unknown
 var gpsStatus = "locating";   // "locating" | "fixed" | "unavailable" — surfaced in the header
@@ -259,11 +266,31 @@ function renderConnector(connector, context, isOos) {
     : "";
 
   var limitBadgesHtml = "";
+  var startBtnHtml = "";
   if (context) {
     var limits = computeLimits(connector, context.rules, context.capabilities);
     limitBadgesHtml = limits.map(renderLimitBadge).join("");
+
+    // Remote-start: only offered for adapters that support it, on a connector
+    // that's actually free to use (isFree === true, not just unknown/falsy —
+    // paid connectors, and any adapter that doesn't report pricing, opt out
+    // by default), and only once you're within startChargeMaxM of the
+    // location — see app.js's withinStartRange (0 disables this entirely).
+    // Shown-but-disabled when Settings > EVcharge account isn't fully filled
+    // in (evchargeAccount is only set once userId/cardCode/email are all
+    // present — see DOMContentLoaded). Note startFreeCharge() itself still
+    // isn't wired to this button's click yet even once enabled.
+    if (context.capabilities.indexOf("REMOTE_START") >= 0 && connector.status === "AVAILABLE" && connector.isFree === true && context.withinStartRange) {
+      startBtnHtml = '<button class="btn btn-primary btn-start-charge"' + (evchargeAccount ? "" : " disabled") + '>' +
+        ICONS.bolt + '<span>' + esc(t("btn-start-charge")) + '</span>' +
+      '</button>';
+    }
   }
 
+  // startBtnHtml sits right after .connector-info, same as the card-header
+  // action buttons — closer to the driver's hand by default, flipped to the
+  // other end under body.left-handed (see style.css).
+  //
   // DOM order inside .connector-status (flex-direction: row-reverse reverses visual order):
   // DOM: [status-badge][not-live?][time][limit-badge]
   // Visual: [limit-badge][time][not-live?][status-badge]
@@ -272,6 +299,7 @@ function renderConnector(connector, context, isOos) {
       '<span class="connector-name">' + esc(connector.displayName) + '</span>' +
       '<span class="connector-type">' + typeLabel + (connector.kw != null ? ' &middot; ' + connector.kw + ' kW' : '') + '</span>' +
     '</div>' +
+    startBtnHtml +
     '<div class="connector-status">' +
       '<span class="status-badge ' + statusClass + '">' + statusLabel + '</span>' +
       notLive +
@@ -312,7 +340,13 @@ function activeConnectors(location) {
 // connectors they show and what buttons sit in the header.
 function renderCardBody(location, index, connectors, headerButtonsHtml, extraClass) {
   var adapter = getAdapter(location.cpoKey) || {};
-  var context = { rules: location.rules, capabilities: adapter.capabilities || [] };
+  var dist = index != null ? locationDistances[index] : null;
+  var context = {
+    rules: location.rules,
+    capabilities: adapter.capabilities || [],
+    // 0 (or unset) means the feature is off — never true regardless of distance.
+    withinStartRange: startChargeMaxM > 0 && dist != null && dist <= startChargeMaxM
+  };
   var connectorsHtml = connectors.map(function(c) { return renderConnector(c, context); }).join('');
 
   return '<div class="card' + (extraClass ? ' ' + extraClass : '') + '">' +
@@ -860,6 +894,10 @@ document.addEventListener("DOMContentLoaded", async function() {
     if (cfg.locations)  LOCATIONS  = cfg.locations;
     if (cfg.maxDistanceKm) maxDistanceKm = cfg.maxDistanceKm;
     if (cfg.locationOrder === "distance") locationOrder = "distance";
+    if (cfg.evcharge) {
+      if (cfg.evcharge.startChargeMaxM != null) startChargeMaxM = cfg.evcharge.startChargeMaxM;
+      if (cfg.evcharge.userId && cfg.evcharge.cardCode && cfg.evcharge.email) evchargeAccount = cfg.evcharge;
+    }
     globalEnabled = (cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
     flashOnAvailableEnabled = cfg.flashOnAvailable === false ? false : true;
     // Defensive: "all locations" mode and per-location auto-refresh are

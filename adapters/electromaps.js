@@ -1,6 +1,12 @@
 var ADAPTERS = window.ADAPTERS || {};
 
 ADAPTERS.electromaps = {
+  // TODO(remote-start): evcharge got a REMOTE_START capability + isFree flag
+  // + startFreeCharge() (see adapters/evcharge.js and app.js's Start-charge
+  // button) — electromaps hasn't been investigated for the equivalent yet
+  // (does its API expose a remote-start endpoint at all, and if so, is there
+  // a free/no-payment path like evcharge's?). Still missing as of the
+  // evcharge remote-start work.
   capabilities: ["CHARGE_START_TIME", "SEARCH_NEARBY"],
   BASE_URL: "https://www.electromaps.com/mapi/v2",
 

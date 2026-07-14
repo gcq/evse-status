@@ -80,7 +80,7 @@ function hasCapability(cpo, cap) {
 function render() {
   document.body.classList.toggle("left-handed", state.handedness === "left");
   document.body.setAttribute("data-theme", state.theme || "auto");
-  document.getElementById("form-root").innerHTML = buildGlobal() + buildLocations();
+  document.getElementById("form-root").innerHTML = buildGlobal() + buildEvchargeAccount() + buildLocations();
   bindFormEvents();
 }
 
@@ -148,6 +148,27 @@ function buildGlobal() {
         '<span class="s-hint">' + languageAutoHint() + '</span>' +
       '</div>' +
     '</div>' +
+  '</section>';
+}
+
+// Account identifiers the REMOTE_START capability needs (see adapters/evcharge.js's
+// startFreeCharge) — global, not per-location, since it's one etecnic account.
+function buildEvchargeAccount() {
+  var acct = state.evcharge || { userId: "", cardCode: "", email: "", startChargeMaxM: 10 };
+  return '<section class="s-section">' +
+    '<h2 class="s-section-title">' + t("section-evcharge-account") + '</h2>' +
+    '<div class="s-field-row">' +
+      field("evcharge-userId", t("field-evcharge-userid"),
+        input("evcharge-userId", acct.userId, { placeholder: "12345" })) +
+      field("evcharge-cardCode", t("field-evcharge-cardcode"),
+        input("evcharge-cardCode", acct.cardCode, { placeholder: "A1B2C3D4" })) +
+      field("evcharge-email", t("field-evcharge-email"),
+        input("evcharge-email", acct.email, { type: "email", placeholder: "you@example.com" })) +
+      field("evcharge-startChargeMaxM", t("field-evcharge-max-start-distance"),
+        input("evcharge-startChargeMaxM", acct.startChargeMaxM != null ? acct.startChargeMaxM : 10, { type: "number", min: 0, step: 1, placeholder: "10" }),
+        t("evcharge-max-start-distance-hint")) +
+    '</div>' +
+    '<span class="s-hint">' + t("evcharge-account-hint") + '</span>' +
   '</section>';
 }
 
@@ -476,6 +497,17 @@ function collectIntoState() {
     state.maxDistanceKm = maxDistEl.value.trim() && !isNaN(maxDist) ? maxDist : null;
   }
 
+  var evUserIdEl = document.querySelector('[data-fid="evcharge-userId"]');
+  if (evUserIdEl) {
+    var evMaxM = parseFloat(document.querySelector('[data-fid="evcharge-startChargeMaxM"]').value);
+    state.evcharge = {
+      userId: evUserIdEl.value.trim(),
+      cardCode: document.querySelector('[data-fid="evcharge-cardCode"]').value.trim(),
+      email: document.querySelector('[data-fid="evcharge-email"]').value.trim(),
+      startChargeMaxM: isNaN(evMaxM) ? 10 : evMaxM
+    };
+  }
+
   document.querySelectorAll(".loc-card").forEach(function(card) {
     var li = +card.dataset.li;
     var loc = state.locations[li];
@@ -531,6 +563,9 @@ function validate(cfg) {
 
   if (cfg.maxDistanceKm != null && cfg.maxDistanceKm < 0)
     errors["g-max-distance"] = t("err-must-be-0-or-greater");
+
+  if (cfg.evcharge && (cfg.evcharge.startChargeMaxM == null || cfg.evcharge.startChargeMaxM < 0))
+    errors["evcharge-startChargeMaxM"] = t("err-must-be-0-or-greater");
 
   if (cfg.locations.length === 0) {
     errors["no-locations"] = t("err-at-least-one-location");

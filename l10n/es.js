@@ -62,6 +62,8 @@ btn-auto-refresh-location = Actualizar automáticamente solo esta ubicación
 btn-hide-location = Ocultar esta ubicación
 btn-show-location = Mostrar esta ubicación
 
+btn-start-charge = Cargar
+
 ## Limit badges
 limit-should-leave-now = Debería irse ya
 limit-should-leave-in = Debería irse en { $duration }
@@ -106,6 +108,15 @@ language-en = English
 language-es = Español
 language-ca = Català
 language-auto-hint = Idioma detectado: { $language }
+
+## Settings — EVcharge account section (needed for the remote-start button)
+section-evcharge-account = Cuenta de EVcharge
+evcharge-account-hint = Se usa para iniciar una carga remotamente en conectores EVcharge gratuitos. No es un inicio de sesión — consulta adapters/evcharge.md para saber cómo obtener estos datos de tu cuenta.
+field-evcharge-userid = ID de usuario
+field-evcharge-cardcode = Código de tarjeta
+field-evcharge-email = Email
+field-evcharge-max-start-distance = Distancia máxima para iniciar (m)
+evcharge-max-start-distance-hint = 0 desactiva el botón por completo
 
 ## Settings — Locations section
 section-locations = Ubicaciones
