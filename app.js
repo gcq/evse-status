@@ -1,4 +1,7 @@
-var REFRESH_INTERVAL = 60;  // seconds
+// Dropped from 60s so a Start button's in-flight/result state (see
+// connectorStartState below) gets confirmed or refuted quickly — a minute
+// is too slow to be useful as the button's own feedback loop.
+var REFRESH_INTERVAL = 5;  // seconds
 var FETCH_TIMEOUT_MS = 10000; // drop a location's refresh if it takes longer than this
 var refreshTimer = null;
 var countdown = REFRESH_INTERVAL;
@@ -13,6 +16,18 @@ var refreshDeadlineMs = null;
 var locationResults = [];
 var locationLastUpdated = []; // ISO timestamp per location, set on each successful fetch
 var locationUpdateFailed = []; // true when the most recent refresh timed out, parallel to locationResults
+
+// Transient (not persisted) per-Start-button state, keyed by "<locIndex>:<connectorId>"
+// — composite key since connector ids aren't guaranteed unique across
+// locations/CPOs. Values: "starting" | "started" | "error", or absent for
+// the normal idle/enabled button. Set by startCharge() below; cleared by
+// fetchAndRenderLocation() the refresh *after* a call settles (not the one
+// it settles during, so a slow in-flight call never gets clobbered by a
+// refresh landing mid-request) — "started"/"error" surviving exactly one
+// refresh is what gives the button its "confirm outcome, then allow retry"
+// behavior, since a still-AVAILABLE connector after that refresh means the
+// remote command silently didn't take.
+var connectorStartState = {};
 
 // WebKit's fetch() rejects aborted requests with a generic AbortError rather
 // than surfacing the signal's abort reason (Chrome/Firefox do) — so timeout
@@ -147,6 +162,31 @@ function accountFor(cpoKey) {
   if (cpoKey === "evcharge") return evchargeAccount;
   if (cpoKey === "electromaps") return electromapsAccount;
   return null;
+}
+
+// Fires the adapter's startFreeCharge() and drives connectorStartState
+// through starting → started/error (see the render logic in renderConnector
+// and the clearing logic in fetchAndRenderLocation for the rest of the
+// state machine). Never throws — a failed call is a normal "error" state,
+// not a caller-visible exception.
+async function startCharge(locIndex, connId) {
+  var loc = LOCATIONS[locIndex];
+  if (!loc) return;
+  var adapter = getAdapter(loc.cpo);
+  var account = accountFor(loc.cpo);
+  if (!adapter || !account) return;
+
+  var key = locIndex + ":" + connId;
+  connectorStartState[key] = "starting";
+  rerenderCardSlot(locIndex);
+
+  try {
+    await adapter.startFreeCharge(account, connId);
+    connectorStartState[key] = "started";
+  } catch (e) {
+    connectorStartState[key] = "error";
+  }
+  rerenderCardSlot(locIndex);
 }
 
 function uniq(arr) {
@@ -289,14 +329,38 @@ function renderConnector(connector, context, isOos) {
     // Shown-but-disabled when that CPO's account isn't fully configured in
     // Settings (accountFor() — evchargeAccount needs userId/cardCode/email
     // all present; electromapsAccount needs refreshToken — see
-    // DOMContentLoaded). Note startFreeCharge() itself still isn't wired to
-    // this button's click yet even once enabled, for either adapter — see
-    // the adapters' own startFreeCharge() comments for why.
+    // DOMContentLoaded).
+    //
+    // Four visual states, driven by connectorStartState (see startCharge()
+    // and fetchAndRenderLocation() below) — idle is the only one still
+    // reachable by click; the other three are result/in-flight states
+    // rendered disabled until the next refresh resolves them:
+    //   idle     → enabled "Charge" (btn-primary)
+    //   starting → disabled "Starting" (still btn-primary, dimmed by :disabled)
+    //   started  → disabled "Started", green (btn-start-charge-ok)
+    //   error    → disabled "Error", red (btn-start-charge-error)
     if (context.capabilities.indexOf("REMOTE_START") >= 0 && connector.status === "AVAILABLE" && connector.isFree === true && context.withinStartRange) {
       var hasAccount = accountFor(context.cpoKey);
-      startBtnHtml = '<button class="btn btn-primary btn-start-charge"' + (hasAccount ? "" : " disabled") + '>' +
-        ICONS.bolt + '<span>' + esc(t("btn-start-charge")) + '</span>' +
-      '</button>';
+      var startKey = context.locIndex + ":" + connector.id;
+      var startState = connectorStartState[startKey];
+      var startAttrs = ' data-loc-index="' + context.locIndex + '" data-conn-id="' + esc(connector.id) + '"';
+      if (startState === "starting") {
+        startBtnHtml = '<button class="btn btn-primary btn-start-charge" disabled' + startAttrs + '>' +
+          ICONS.bolt + '<span>' + esc(t("btn-start-charging")) + '</span>' +
+        '</button>';
+      } else if (startState === "started") {
+        startBtnHtml = '<button class="btn btn-start-charge-ok btn-start-charge" disabled' + startAttrs + '>' +
+          ICONS.bolt + '<span>' + esc(t("btn-start-charge-started")) + '</span>' +
+        '</button>';
+      } else if (startState === "error") {
+        startBtnHtml = '<button class="btn btn-start-charge-error btn-start-charge" disabled' + startAttrs + '>' +
+          ICONS.bolt + '<span>' + esc(t("btn-start-charge-error")) + '</span>' +
+        '</button>';
+      } else {
+        startBtnHtml = '<button class="btn btn-primary btn-start-charge"' + (hasAccount ? "" : " disabled") + startAttrs + '>' +
+          ICONS.bolt + '<span>' + esc(t("btn-start-charge")) + '</span>' +
+        '</button>';
+      }
     }
   }
 
@@ -358,6 +422,7 @@ function renderCardBody(location, index, connectors, headerButtonsHtml, extraCla
     rules: location.rules,
     capabilities: adapter.capabilities || [],
     cpoKey: location.cpoKey,
+    locIndex: index,
     // 0 (or unset) means the feature is off — never true regardless of distance.
     withinStartRange: startChargeMaxM > 0 && dist != null && dist <= startChargeMaxM
   };
@@ -796,6 +861,21 @@ async function fetchAndRenderLocation(i) {
   var justBecameAvailable = !timedOut && hadPriorResult && hasNewlyAvailableConnector(priorResult, result);
   locationResults[i] = result;
 
+  // Resolve any settled Start-button state (started/error) from a fresh
+  // fetch — "starting" is deliberately left alone here (see
+  // connectorStartState's own comment): only a settled state should be
+  // cleared by the refresh *after* it landed, giving the button one full
+  // refresh cycle to show its result before reverting to idle/retry. A
+  // timed-out refresh isn't a real confirmation, so it clears nothing.
+  if (!timedOut && result && result.connectors) {
+    result.connectors.forEach(function(c) {
+      var key = i + ":" + c.id;
+      if (connectorStartState[key] === "started" || connectorStartState[key] === "error") {
+        delete connectorStartState[key];
+      }
+    });
+  }
+
   var slot = document.getElementById("card-slot-" + i);
   if (slot) {
     var html = renderCard(result, i);
@@ -929,7 +1009,20 @@ document.addEventListener("DOMContentLoaded", async function() {
   updateRefreshUI();
   updateGpsStatusUI();
 
+  // Shared by every section a Start button can render in (main list,
+  // hidden — a hidden location can still be nearby; out-of-range/OOS can't,
+  // see startChargeMaxM vs. maxDistanceKm, so those sections skip this).
+  function handleStartBtnClick(e) {
+    var startBtn = e.target.closest(".btn-start-charge");
+    if (startBtn && !startBtn.disabled) {
+      startCharge(parseInt(startBtn.getAttribute("data-loc-index"), 10), startBtn.getAttribute("data-conn-id"));
+      return true;
+    }
+    return false;
+  }
+
   document.getElementById("cards").addEventListener("click", function(e) {
+    if (handleStartBtnClick(e)) return;
     var refreshBtn = e.target.closest(".refresh-loc-btn");
     if (refreshBtn) {
       refreshSingleLocation(parseInt(refreshBtn.getAttribute("data-loc-index"), 10));
@@ -948,6 +1041,7 @@ document.addEventListener("DOMContentLoaded", async function() {
   });
 
   document.getElementById("hidden-section").addEventListener("click", function(e) {
+    if (handleStartBtnClick(e)) return;
     var unhideBtn = e.target.closest(".unhide-loc-btn");
     if (unhideBtn) {
       setLocationHidden(parseInt(unhideBtn.getAttribute("data-loc-index"), 10), false);

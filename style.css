@@ -966,6 +966,12 @@ body.left-handed .card-header .location-name        { text-align: right; }
   white-space: nowrap;
 }
 
+/* Result states for the Start button's in-flight state machine (see
+   connectorStartState in app.js) — .btn-start-charge stays for layout
+   (order/flip under body.left-handed below), these just override color. */
+.btn-start-charge-ok    { background: var(--green-bg); color: var(--green); border-color: var(--green-bg); }
+.btn-start-charge-error { background: var(--red-bg);   color: var(--red);   border-color: var(--red-bg); }
+
 /* Same convention as .card-header's hide/auto/refresh buttons: sits right
    after .connector-info by default (closer to the driver's hand), flips
    past .connector-status to the other end of the row when the phone is

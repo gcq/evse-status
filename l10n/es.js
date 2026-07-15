@@ -63,6 +63,9 @@ btn-hide-location = Ocultar esta ubicación
 btn-show-location = Mostrar esta ubicación
 
 btn-start-charge = Cargar
+btn-start-charging = Iniciando
+btn-start-charge-started = Iniciada
+btn-start-charge-error = Error
 
 ## Limit badges
 limit-should-leave-now = Debería irse ya

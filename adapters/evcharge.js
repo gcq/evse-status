@@ -102,9 +102,11 @@ ADAPTERS.evcharge = {
   },
 
   // Mirrors the app's own free-connector path (payments/create-payment with
-  // amount=0 — no Stripe confirmation step, see adapters/evcharge.md). Not
-  // called from the UI yet: the Start button that will use this is rendered
-  // disabled until this has been exercised against a real account.
+  // amount=0 — no Stripe confirmation step, see adapters/evcharge.md). Wired
+  // to the Start button's click (app.js's startCharge()) — the only actual
+  // guard against starting a paid connector is the isFree check in
+  // app.js's renderConnector; whether evcharge's own backend also rejects
+  // amount=0 against a non-free socket server-side is still unconfirmed.
   // `account` is { userId, cardCode, email } from settings.
   async startFreeCharge(account, socketId, chargingTime, chargingEnergy, priceTimeMin, priceEnergyKwh) {
     var params = new URLSearchParams();

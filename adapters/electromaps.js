@@ -62,9 +62,9 @@ ADAPTERS.electromaps = {
   //
   // Unconfirmed whether the endpoint itself refuses to start a paid
   // connector server-side — the UI-level isFree/AVAILABLE/withinStartRange
-  // gating in app.js is the only guard right now. Not called from the UI
-  // yet: same caution as evcharge's startFreeCharge(), pending exercising
-  // this against a real account before wiring the Start button's click.
+  // gating in app.js's renderConnector is the only actual guard. Wired to
+  // the Start button's click (app.js's startCharge()) despite that being
+  // unconfirmed — same caution as evcharge's startFreeCharge().
   async startFreeCharge(account, connectorId) {
     var headers = await this._authHeaders(account.refreshToken);
     var resp = await fetch(this.BASE_URL_V1 + "/remote/start/" + connectorId, { headers: headers });

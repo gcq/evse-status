@@ -78,6 +78,19 @@ own account's credentials; nothing here bypasses electromaps' own login.
 
 ### Google-only accounts (no password path)
 
+**Automated helper:** `python3 adapters/electromaps_auth.py` (requires
+`playwright` + `playwright install webkit`, already set up in this project's
+dev environment) does everything below except the Google login itself —
+generates the PKCE pair, builds the authorize URL, opens a real headed
+WebKit window for you to log in, captures the authorization code via
+`page.on("response")` (network-level interception, same trick as watching
+DevTools' Network tab by hand — it sees the redirect's `Location` header
+even though the browser can't follow it to `electromapsandroid://`), runs
+the token exchange automatically, and prints the `refresh_token` ready to
+paste into Settings. Falls back to a manual paste-the-code prompt if
+automatic capture doesn't work for some reason. The manual step-by-step
+version is below for reference or if the script breaks.
+
 Confirmed 2026-07-15 against a live Google-linked account: **there is no
 way to bootstrap a password for an account that signed up via Google.**
 Both app-provided password flows dead-end:
@@ -327,10 +340,19 @@ Landed 2026-07-15: `REMOTE_START` capability, per-connector `isFree` (from
 refresh via `/oauth2/token` (`grant_type=refresh_token`, cached in memory
 until near expiry). Settings gained an "Electromaps account" section
 (`config.electromaps.refreshToken`, bootstrapped per "Google-only accounts"
-above). The Start button now renders (disabled until that field is filled
-in) for both evcharge and electromaps connectors — but for neither adapter
-is `startFreeCharge()` actually wired to the button's click yet, pending the
-free-connector confirmation above.
+above).
+
+Landed 2026-07-15 (same day, second pass): the Start button is now actually
+wired to `startFreeCharge()` for both evcharge and electromaps (`app.js`'s
+`startCharge()`), with a visible in-flight/result state machine —
+disabled+"Starting" while the call is in flight, then green+"Started" or
+red+"Error" until the next auto-refresh (dropped to 5s) either confirms the
+connector left `AVAILABLE` (button disappears, normal render gate) or shows
+it's still `AVAILABLE` (button reverts to enabled, treated as a silent
+failure worth retrying). The free-connector confirmation flagged above is
+still unconfirmed — this shipped without it, so the only thing standing
+between a user and an accidental paid-connector start is the client-side
+`isFree` check.
 
 **How this was found:** downloaded the XAPK via Playwright/webkit
 (APKPure's real download link is generated client-side and blocks plain
