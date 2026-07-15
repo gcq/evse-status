@@ -1,13 +1,10 @@
-// Locale negotiation + Fluent-backed message lookup. Fluent (not a hand-rolled
-// key/value swap) is the point: it resolves CLDR plural categories and lets a
-// translation reorder a sentence around its placeables (e.g. "ago" trailing
-// in English vs. "hace"/"fa" leading in Spanish/Catalan) without any of that
-// logic living in app.js/settings.js.
+// Locale negotiation + Fluent-backed message lookup. Fluent resolves CLDR
+// plural categories and lets a translation reorder a sentence around its
+// placeables (e.g. "ago" trailing in English vs. "hace"/"fa" leading in
+// Spanish/Catalan) without any of that logic living in app.js/settings.js.
 //
-// No fallback chain: every l10n/*.js file is required to carry the exact same
-// set of message ids (checked by hand when adding one — see the three files'
-// matching structure), so there's nothing a fallback would ever catch. That
-// means each locale loads exactly one script instead of a chain of them.
+// No fallback chain: every l10n/*.js file must carry the exact same set of
+// message ids, so each locale loads exactly one script, never a chain.
 var L10N_SUPPORTED_LOCALES = ["ca", "es", "en"];
 
 var l10nBundle = null;
@@ -27,16 +24,14 @@ function detectBrowserLocale() {
 }
 
 // Synchronous and I/O-free by design — called from the inline <script> in
-// <head> (alongside the theme lookup) so document.documentElement.lang is
-// correct from first paint, well before initL10n()'s network round trip
-// (Fluent CDN import + locale script) can resolve.
+// <head> so document.documentElement.lang is correct from first paint,
+// before initL10n()'s network round trip can resolve.
 //
-// explicitLocale is only passed by Settings' live language-switch preview
-// (initL10n(state.locale), before Save persists it) — it means "the user
-// just picked this value right now", so it must win outright, including
-// "auto" itself meaning "detect fresh", not "fall back to whatever's still
-// saved in localStorage from before this preview". Omitting the argument
-// entirely (the normal page-load path) is what defers to the saved config.
+// explicitLocale is passed only by Settings' live language-switch preview
+// (before Save persists it): it means "the user just picked this value", so
+// it wins outright, including "auto" meaning "detect fresh" rather than
+// falling back to whatever's saved in localStorage. Omitting the argument
+// (the normal page-load path) defers to the saved config.
 function detectLocale(explicitLocale) {
   if (explicitLocale) return explicitLocale === "auto" ? detectBrowserLocale() : explicitLocale;
   var cfg = getConfig();
@@ -46,13 +41,10 @@ function detectLocale(explicitLocale) {
 
 // Injects l10n/{locale}.js, which assigns its Fluent source text into
 // window.FTL_SOURCES[locale] — a <script> tag rather than fetch()/XHR, since
-// fetching sibling file:// resources is blocked by browsers (which broke
-// local testing by opening index.html directly instead of through a
-// server), and loaded only for the one locale actually needed. Cache-busted
-// with the deployed commit sha (falls back to no cache-busting if that
-// lookup fails) rather than something like Date.now() — a real version key
-// lets the browser cache this ~5KB file indefinitely between deploys instead
-// of re-fetching it on every single page load.
+// fetching sibling file:// resources is blocked when testing locally by
+// opening index.html directly. Cache-busted with the deployed commit sha
+// (falls back to no cache-busting if that lookup fails), so the browser can
+// cache this file indefinitely between deploys instead of on every load.
 function loadLocaleScript(loc, version) {
   return new Promise(function(resolve) {
     if (window.FTL_SOURCES && window.FTL_SOURCES[loc]) { resolve(); return; }

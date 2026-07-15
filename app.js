@@ -1,6 +1,5 @@
-// Dropped from 60s so a Start button's in-flight/result state (see
-// connectorStartState below) gets confirmed or refuted quickly — a minute
-// is too slow to be useful as the button's own feedback loop.
+// Short enough to double as the Start button's own confirm/retry feedback
+// loop (see connectorStartState below).
 var REFRESH_INTERVAL = 5;  // seconds
 var FETCH_TIMEOUT_MS = 10000; // drop a location's refresh if it takes longer than this
 var refreshTimer = null;
@@ -9,40 +8,35 @@ var countdownTimer = null;
 var globalEnabled = true;
 var flashOnAvailableEnabled = true;
 var missedRefreshWhileHidden = false;
-// Wall-clock deadline for the next auto-refresh. The displayed countdown is
-// derived from this on every tick instead of being decremented by hand, so it
-// stays accurate even when the interval's ticks get throttled while hidden.
+// Wall-clock deadline for the next auto-refresh; the displayed countdown is
+// derived from this on every tick rather than decremented by hand, so it
+// stays accurate even if the interval's ticks get throttled while hidden.
 var refreshDeadlineMs = null;
 var locationResults = [];
 var locationLastUpdated = []; // ISO timestamp per location, set on each successful fetch
 var locationUpdateFailed = []; // true when the most recent refresh timed out, parallel to locationResults
 
-// Transient (not persisted) per-Start-button state, keyed by "<locIndex>:<connectorId>"
-// — composite key since connector ids aren't guaranteed unique across
-// locations/CPOs. Values: "starting" | "started" | "error", or absent for
-// the normal idle/enabled button. Set by startCharge() below; cleared by
-// fetchAndRenderLocation() the refresh *after* a call settles (not the one
-// it settles during, so a slow in-flight call never gets clobbered by a
-// refresh landing mid-request) — "started"/"error" surviving exactly one
-// refresh is what gives the button its "confirm outcome, then allow retry"
-// behavior, since a still-AVAILABLE connector after that refresh means the
-// remote command silently didn't take.
+// Transient (not persisted) per-Start-button state, keyed by
+// "<locIndex>:<connectorId>" (composite since connector ids aren't unique
+// across locations/CPOs). Values: "starting" | "started" | "error", or
+// absent for the normal idle/enabled button. Set by startCharge(); cleared
+// by fetchAndRenderLocation() one refresh after a call settles, giving the
+// button one full cycle to show its result before reverting to idle/retry.
 var connectorStartState = {};
 
 // WebKit's fetch() rejects aborted requests with a generic AbortError rather
 // than surfacing the signal's abort reason (Chrome/Firefox do) — so timeout
-// detection has to check the signal itself, not the caught error's name.
+// detection must check the signal itself, not the caught error's name.
 function isTimeoutSignal(signal) {
   return !!(signal && signal.aborted && signal.reason && signal.reason.name === "TimeoutError");
 }
 
 var locationOrder = "config"; // "config" (default) or "distance" — opt-in via Settings
 var maxDistanceKm = null;
-// How close (meters) you need to be, per locationDistances, before a REMOTE_START
-// adapter's Start button appears on an available connector. 0 = disabled,
-// never show the button. Only ever satisfiable when Location order = Distance
-// is on (that's what starts the GPS watch below). Set from config.evcharge at
-// startup — see DOMContentLoaded.
+// How close (meters) you need to be before a REMOTE_START adapter's Start
+// button appears on an available connector. 0 disables the button entirely.
+// Only satisfiable when Location order = Distance (that's what starts the
+// GPS watch below). Set from config.evcharge — see DOMContentLoaded.
 var startChargeMaxM = 10;
 var evchargeAccount = null; // { userId, cardCode, email } from config.evcharge, or null
 var electromapsAccount = null; // { refreshToken } from config.electromaps, or null
@@ -95,12 +89,9 @@ function computeLimits(connector, rules, capabilities) {
 
 function renderLimitBadge(limit) {
   if (limit.type === "mustLeaveWhenNotCharging") {
-    // deadline is a fixed sentinel (0) meaning "always immediately due" —
-    // it's not a real point in time, so it must never be fed through the
-    // elapsed-since-deadline math below (that measures time since the Unix
-    // epoch, ~56 years, and used to render as e.g. "Should have left
-    // 495356h 42m ago" once the overdue text started showing computed
-    // durations instead of a fixed "MUST LEAVE" string).
+    // deadline is a fixed sentinel (0, "always immediately due"), not a real
+    // point in time — must never be fed through the elapsed-since-deadline
+    // math below, which measures time since the Unix epoch.
     var lines = [];
     if (limit.sessionUserName) lines.push(esc(limit.sessionUserName));
     if (limit.sessionMinutes != null) {
@@ -216,10 +207,9 @@ async function fetchLocation(locConfig, signal) {
       signal
     );
 
-    // TODO(remove): migration shim only, for locations pinned before lat/lon
-    // was captured at pin time (discover.js's pinSelected() now sets it
-    // directly). Safe to delete once existing users' configs have all been
-    // backfilled once — new locations never need this.
+    // TODO(remove): migration shim for locations pinned before lat/lon was
+    // captured at pin time. Safe to delete once existing configs have all
+    // backfilled once.
     if ((locConfig.lat == null || locConfig.lon == null) && data.lat != null && data.lon != null) {
       locConfig.lat = data.lat;
       locConfig.lon = data.lon;
@@ -227,8 +217,7 @@ async function fetchLocation(locConfig, signal) {
       if (currentPosition) computeDistances();
     }
 
-    // TODO(remove): same migration shim as above, for address — safe to
-    // delete once existing users' configs have all been backfilled once.
+    // TODO(remove): same migration shim as above, for address.
     if (locConfig.address == null && data.address != null) {
       locConfig.address = data.address;
       persistLocations();
@@ -321,22 +310,18 @@ function renderConnector(connector, context, isOos) {
     var limits = computeLimits(connector, context.rules, context.capabilities);
     limitBadgesHtml = limits.map(renderLimitBadge).join("");
 
-    // Remote-start: only offered for adapters that support it, on a connector
-    // that's actually free to use (isFree === true, not just unknown/falsy —
-    // paid connectors, and any adapter that doesn't report pricing, opt out
-    // by default), and only once you're within startChargeMaxM of the
-    // location — see app.js's withinStartRange (0 disables this entirely).
-    // Shown-but-disabled when that CPO's account isn't fully configured in
-    // Settings (accountFor() — evchargeAccount needs userId/cardCode/email
-    // all present; electromapsAccount needs refreshToken — see
-    // DOMContentLoaded).
+    // Remote-start: only for adapters that support it, on a connector that's
+    // actually free to use (isFree === true — paid connectors and adapters
+    // that don't report pricing opt out by default), and only within
+    // startChargeMaxM of the location (withinStartRange; 0 disables this
+    // entirely). Shown-but-disabled if that CPO's account isn't fully
+    // configured in Settings (see accountFor()).
     //
-    // Four visual states, driven by connectorStartState (see startCharge()
-    // and fetchAndRenderLocation() below) — idle is the only one still
-    // reachable by click; the other three are result/in-flight states
-    // rendered disabled until the next refresh resolves them:
+    // Four visual states, driven by connectorStartState — idle is the only
+    // one reachable by click; the rest are disabled until the next refresh
+    // resolves them:
     //   idle     → enabled "Charge" (btn-primary)
-    //   starting → disabled "Starting" (still btn-primary, dimmed by :disabled)
+    //   starting → disabled "Starting" (btn-primary, dimmed)
     //   started  → disabled "Started", green (btn-start-charge-ok)
     //   error    → disabled "Error", red (btn-start-charge-error)
     if (context.capabilities.indexOf("REMOTE_START") >= 0 && connector.status === "AVAILABLE" && connector.isFree === true && context.withinStartRange) {
@@ -793,14 +778,9 @@ async function autoRefreshTick() {
   scheduleNextRefresh();
 }
 
-// Fetches one location, updates its card slot (if present) and the global
-// out-of-service/hidden/out-of-range sections. Never throws — a fetch
-// failure becomes an error-state result like any other, since callers just
-// need to know when this location is done, not whether it succeeded.
 // True if any connector present in both results moved from some other status
-// into AVAILABLE — the signal that's worth flashing the card for. Connectors
-// with no known prior status (first load, or newly appeared) don't count:
-// there's nothing to say they "became" available from.
+// into AVAILABLE — the signal worth flashing the card for. Connectors with no
+// known prior status (first load, or newly appeared) don't count.
 function hasNewlyAvailableConnector(prevResult, newResult) {
   if (!prevResult || !newResult) return false;
   var prevStatusById = {};
@@ -826,6 +806,9 @@ function flashCard(slot) {
   });
 }
 
+// Fetches one location and updates its card slot plus the global
+// out-of-service/hidden/out-of-range sections. Never throws — a fetch
+// failure becomes an error-state result like any other.
 async function fetchAndRenderLocation(i) {
   var loc = window.LOCATIONS[i];
   var priorResult = locationResults[i];
@@ -855,17 +838,11 @@ async function fetchAndRenderLocation(i) {
       locationUpdateFailed[i] = false;
     }
   }
-  // Also fires after a catch-up refresh triggered by the tab regaining
-  // visibility, since that goes through this same function/comparison — a
-  // status change while backgrounded still gets flashed once it's visible.
   var justBecameAvailable = !timedOut && hadPriorResult && hasNewlyAvailableConnector(priorResult, result);
   locationResults[i] = result;
 
   // Resolve any settled Start-button state (started/error) from a fresh
-  // fetch — "starting" is deliberately left alone here (see
-  // connectorStartState's own comment): only a settled state should be
-  // cleared by the refresh *after* it landed, giving the button one full
-  // refresh cycle to show its result before reverting to idle/retry. A
+  // fetch — "starting" is left alone (see connectorStartState above). A
   // timed-out refresh isn't a real confirmation, so it clears nothing.
   if (!timedOut && result && result.connectors) {
     result.connectors.forEach(function(c) {

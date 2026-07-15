@@ -72,23 +72,18 @@ ADAPTERS.evcharge = {
           lon: cLon,
           distanceM: dist,
           // Exact match across every charger/ChargePoint at the same physical
-          // site (confirmed live: e.g. id_charger 10511 & 10512 share this
-          // pair) — from the RAW strings, not the parsed cLat/cLon above, so
-          // equality is exact rather than incidentally relying on parseFloat
-          // determinism. Lets discover.js group multiple chargers into one
-          // Location card. See MODEL(hierarchy) note in config.js.
+          // site, from the raw strings (not parsed cLat/cLon) so equality is
+          // exact rather than relying on parseFloat determinism. Lets
+          // discover.js group multiple chargers into one Location card. See
+          // MODEL(hierarchy) note in config.js.
           //
           // TODO(hierarchy): this exact-string match misses real-world
-          // duplicates when the provider itself never assigned a shared site
-          // anchor — confirmed live with id_charger 5671 vs 2067, same
-          // address/city/postal code (Sant Vicenç dels Horts, Carrer
-          // Claverol 6) but different location_latitude/location_longitude
-          // (41.38820545,2.00799539 vs 41.3881885,2.0079744 — ~2m apart) AND
-          // different location_id (322433 vs 293923) — i.e. the provider's
-          // own backend has two undeduplicated location records for one
-          // physical site. A distance-tolerance match (e.g. merge under
-          // ~5-10m) would catch this at the cost of some false-positive-merge
-          // risk for genuinely distinct nearby chargers; not implemented.
+          // duplicates the provider itself never deduplicated — two chargers
+          // at the same physical site with slightly different coordinates
+          // and a different location_id. A distance-tolerance match (e.g.
+          // merge under ~5-10m) would catch this at the cost of some
+          // false-positive-merge risk for genuinely distinct nearby
+          // chargers; not implemented.
           siteKey: ch.location_latitude + "," + ch.location_longitude
         };
       })
@@ -102,12 +97,10 @@ ADAPTERS.evcharge = {
   },
 
   // Mirrors the app's own free-connector path (payments/create-payment with
-  // amount=0 — no Stripe confirmation step, see adapters/evcharge.md). Wired
-  // to the Start button's click (app.js's startCharge()) — the only actual
-  // guard against starting a paid connector is the isFree check in
-  // app.js's renderConnector; whether evcharge's own backend also rejects
-  // amount=0 against a non-free socket server-side is still unconfirmed.
-  // `account` is { userId, cardCode, email } from settings.
+  // amount=0, see adapters/evcharge.md). The only guard against starting a
+  // paid connector is the isFree check in app.js's renderConnector — whether
+  // evcharge's own backend also rejects amount=0 against a non-free socket
+  // server-side is unconfirmed. `account` is { userId, cardCode, email }.
   async startFreeCharge(account, socketId, chargingTime, chargingEnergy, priceTimeMin, priceEnergyKwh) {
     var params = new URLSearchParams();
     params.append("socketId", socketId);

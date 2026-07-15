@@ -26,17 +26,12 @@ function defaultConfig() {
     locationOrder: "config",
     maxDistanceKm: null,
     flashOnAvailable: true,
-    // Account identifiers for evcharge's remote-start call (payments/create-payment).
-    // Not a login session — see adapters/evcharge.md for how these are obtained.
-    // startChargeMaxM: how close (meters) you need to be before the Start
-    // button appears on an available connector. 0 disables the button entirely.
-    // Shared across every REMOTE_START adapter (evcharge, electromaps) —
-    // one proximity threshold, not per-CPO.
+    // Account identifiers for evcharge's remote-start call. startChargeMaxM
+    // (meters) is the proximity threshold shared by every REMOTE_START
+    // adapter — 0 disables the Start button entirely. See adapters/evcharge.md.
     evcharge: { userId: "", cardCode: "", email: "", startChargeMaxM: 10 },
-    // Cognito refresh token for electromaps' remote-start call. Not a
-    // username/password — this account is Google-only, so the token has to
-    // be bootstrapped manually and re-bootstrapped whenever it expires from
-    // disuse. See adapters/electromaps.md's "Getting a token pair" section.
+    // Cognito refresh token for electromaps' remote-start call — see
+    // adapters/electromaps.md's "Getting a token pair" section.
     electromaps: { refreshToken: "" },
     locations: (typeof LOCATIONS !== "undefined")
       ? JSON.parse(JSON.stringify(LOCATIONS))
@@ -67,12 +62,9 @@ function esc(s) {
 var deployedVersionPromise = null;
 
 // Fetches the live-deployed commit sha once per page load and memoizes the
-// promise, so both the footer and l10n.js's cache-busting query param (which
-// needs this before translations are even loaded, hence no t() here) share
-// one network call instead of two. Time-boxed short: this sits in front of
-// every page render (l10n.js awaits it before loading a locale), so a slow
-// or unreachable GitHub API must fail fast and fall back cleanly rather than
-// stall the whole app.
+// promise, so the footer and l10n.js's cache-busting query param share one
+// network call. Time-boxed short since l10n.js awaits this before loading a
+// locale — a slow/unreachable GitHub API must fail fast, not stall the app.
 function getDeployedVersion() {
   if (!deployedVersionPromise) {
     deployedVersionPromise = fetch(

@@ -5,18 +5,14 @@ ADAPTERS.electromaps = {
   BASE_URL: "https://www.electromaps.com/mapi/v2",
   BASE_URL_V1: "https://www.electromaps.com/mapi/v1",
 
-  // Cognito Hosted UI token endpoint + this app's public client ID (both
-  // baked into the APK's prodamplifyconfiguration.json — see
-  // adapters/electromaps.md's "Getting a token pair" section). No client
-  // secret: same public mobile-client flow the app itself uses.
+  // Cognito Hosted UI token endpoint + this app's public client ID — see
+  // adapters/electromaps.md's "Getting a token pair" section.
   TOKEN_URL: "https://idp.electromaps.com/oauth2/token",
   CLIENT_ID: "e2582mkf7dvklnd3d91mpfrr0",
 
-  // In-memory access/id token cache, keyed by nothing (single account) —
-  // refreshed lazily whenever a call needs auth and the cache is missing or
-  // past its expiry. Never persisted: only the long-lived refreshToken is
-  // stored in Settings (config.electromaps.refreshToken), same as evcharge's
-  // account fields — see adapters/electromaps.md for how to obtain it.
+  // In-memory access/id token cache (single account, refreshed lazily when
+  // missing or expired). Never persisted — only the long-lived refreshToken
+  // is stored in Settings (config.electromaps.refreshToken).
   _tokenCache: null, // { accessToken, idToken, expiresAt } or null
 
   async _getTokens(refreshToken) {
@@ -54,17 +50,13 @@ ADAPTERS.electromaps = {
     };
   },
 
-  // GET mapi/v1/remote/start/{idtoma} — confirmed live in the Android app's
-  // Retrofit interface (decompiled APK, see the "Remote-start investigation"
-  // section in adapters/electromaps.md), not exposed anywhere on the web
-  // app. `idtoma` is the connector id (electromaps' "toma" = socket/outlet).
-  // `account` is { refreshToken } from settings.
+  // GET mapi/v1/remote/start/{idtoma} — mobile-app-only endpoint, not
+  // exposed on the web app (see adapters/electromaps.md). `idtoma` is the
+  // connector id. `account` is { refreshToken } from settings.
   //
-  // Unconfirmed whether the endpoint itself refuses to start a paid
-  // connector server-side — the UI-level isFree/AVAILABLE/withinStartRange
-  // gating in app.js's renderConnector is the only actual guard. Wired to
-  // the Start button's click (app.js's startCharge()) despite that being
-  // unconfirmed — same caution as evcharge's startFreeCharge().
+  // Whether the endpoint itself refuses to start a paid connector
+  // server-side is unconfirmed — the UI-level isFree/AVAILABLE/
+  // withinStartRange gating in app.js's renderConnector is the only guard.
   async startFreeCharge(account, connectorId) {
     var headers = await this._authHeaders(account.refreshToken);
     var resp = await fetch(this.BASE_URL_V1 + "/remote/start/" + connectorId, { headers: headers });

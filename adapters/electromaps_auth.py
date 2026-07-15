@@ -3,36 +3,29 @@
 Bootstraps an electromaps Cognito refresh token for a Google-only account.
 
 See adapters/electromaps.md's "Google-only accounts (no password path)"
-section for the full manual version of this flow and why it's needed (no
-self-service password path exists for a Google-linked electromaps account,
-and the OAuth redirect lands on an Android-only custom URL scheme a browser
-can't follow). This script automates everything except the Google login
-itself: PKCE generation, launching a real browser window, capturing the
-authorization code from the network response (rather than requiring manual
-DevTools inspection), and exchanging it for tokens.
+section for background: no self-service password path exists for a
+Google-linked electromaps account, and the OAuth redirect lands on an
+Android-only custom URL scheme a browser can't follow. This script
+automates everything except the Google login itself: PKCE generation,
+launching a real browser window, capturing the authorization code from the
+network response, and exchanging it for tokens.
 
 Requires: pip install playwright && playwright install webkit
-(both already present in this project's dev environment as of 2026-07-15 —
-see the "How to re-run the investigation" section of this same doc for the
-same tooling used to find these endpoints in the first place.)
 
 Usage:
     python3 adapters/electromaps_auth.py
 
-A real (headed) WebKit window opens on the Cognito Hosted UI login page.
-Log in with the Google account tied to your electromaps account. Once
-Google redirects back through Cognito, this script intercepts the final
-redirect at the network level (Playwright's response event still fires for
-that request even though the browser itself cannot navigate to the
-resulting `electromapsandroid://` scheme — same as inspecting DevTools'
-Network tab by hand), extracts the authorization code, exchanges it for a
-token pair, and prints the refresh_token to paste into this app's Settings
-> Electromaps account field.
+A headed WebKit window opens on the Cognito Hosted UI login page. Log in
+with the Google account tied to your electromaps account. Once Google
+redirects back through Cognito, this script intercepts the final redirect
+at the network level (Playwright's response event fires for that request
+even though the browser can't navigate to the resulting
+`electromapsandroid://` scheme), extracts the authorization code, exchanges
+it for a token pair, and prints the refresh_token to paste into this app's
+Settings > Electromaps account field.
 
-If automatic capture fails for any reason (Cognito changes its redirect
-mechanics, a Playwright/browser quirk, etc.), the script falls back to
-prompting you to paste the code manually — same as the fully-manual
-DevTools method, just as a last resort rather than the default path.
+If automatic capture fails, the script falls back to prompting for the
+code to be pasted manually.
 """
 import asyncio
 import base64

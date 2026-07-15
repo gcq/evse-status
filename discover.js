@@ -70,10 +70,9 @@ function geolocate() {
       setBanner(false);
       var lat = pos.coords.latitude;
       var lon = pos.coords.longitude;
-      // map.getBounds() right after setView() can still report the OLD view —
-      // Leaflet hasn't finished applying the pan/zoom yet at that point. Wait
-      // for the moveend this setView triggers (fires once the view is
-      // actually settled), then search immediately using its real bounds,
+      // map.getBounds() right after setView() can still report the OLD view,
+      // since Leaflet hasn't applied the pan/zoom yet. Wait for the moveend
+      // this setView triggers, then search using its real bounds —
       // short-circuiting the persistent moveend handler's 2s debounce below.
       map.once("moveend", function() {
         clearTimeout(searchDebounce);
@@ -398,10 +397,9 @@ function pinSelected() {
     var pin = group.pin;
 
     // Find an existing config Location for this site: matches if its primary
-    // id, OR any of its connectors' effective charger id, is one of this
-    // site's known member ids. Correctly finds a previously solo-pinned
-    // charger (e.g. existing loc.id === "10511") even though "groups" didn't
-    // exist yet when it was first pinned.
+    // id, or any of its connectors' effective charger id, is one of this
+    // site's known member ids — so a solo-pinned charger still matches a
+    // later multi-charger group at the same site.
     var existing = null;
     for (var i = 0; i < cfg.locations.length; i++) {
       var loc = cfg.locations[i];
