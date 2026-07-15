@@ -1,7 +1,10 @@
-// Short enough to double as the Start button's own confirm/retry feedback
-// loop (see connectorStartState below).
-var REFRESH_INTERVAL = 5;  // seconds
+var REFRESH_INTERVAL = 60;  // seconds
 var FETCH_TIMEOUT_MS = 10000; // drop a location's refresh if it takes longer than this
+// How long a Start button shows its "Started"/"Error" result before
+// startCharge() below re-fetches that one location to confirm/retry — kept
+// short and independent of REFRESH_INTERVAL so the result is visible but
+// doesn't force fast polling on every location.
+var START_CONFIRM_DELAY_MS = 5000;
 var refreshTimer = null;
 var countdown = REFRESH_INTERVAL;
 var countdownTimer = null;
@@ -159,7 +162,9 @@ function accountFor(cpoKey) {
 // through starting → started/error (see the render logic in renderConnector
 // and the clearing logic in fetchAndRenderLocation for the rest of the
 // state machine). Never throws — a failed call is a normal "error" state,
-// not a caller-visible exception.
+// not a caller-visible exception. After the result is shown, re-fetches just
+// this location (not a global refresh) so the button resolves to normal/retry
+// without waiting for the next scheduled auto-refresh.
 async function startCharge(locIndex, connId) {
   var loc = LOCATIONS[locIndex];
   if (!loc) return;
@@ -178,6 +183,7 @@ async function startCharge(locIndex, connId) {
     connectorStartState[key] = "error";
   }
   rerenderCardSlot(locIndex);
+  setTimeout(function() { fetchAndRenderLocation(locIndex); }, START_CONFIRM_DELAY_MS);
 }
 
 function uniq(arr) {
