@@ -80,7 +80,7 @@ function hasCapability(cpo, cap) {
 function render() {
   document.body.classList.toggle("left-handed", state.handedness === "left");
   document.body.setAttribute("data-theme", state.theme || "auto");
-  document.getElementById("form-root").innerHTML = buildGlobal() + buildEvchargeAccount() + buildLocations();
+  document.getElementById("form-root").innerHTML = buildGlobal() + buildEvchargeAccount() + buildElectromapsAccount() + buildLocations();
   bindFormEvents();
 }
 
@@ -169,6 +169,23 @@ function buildEvchargeAccount() {
         t("evcharge-max-start-distance-hint")) +
     '</div>' +
     '<span class="s-hint">' + t("evcharge-account-hint") + '</span>' +
+  '</section>';
+}
+
+// Cognito refresh token the REMOTE_START capability needs (see
+// adapters/electromaps.js's startFreeCharge) — global, not per-location,
+// same as the EVcharge account above. Not a username/password: this account
+// is Google-only, so the token has to be bootstrapped manually — see
+// adapters/electromaps.md's "Getting a token pair" section.
+function buildElectromapsAccount() {
+  var acct = state.electromaps || { refreshToken: "" };
+  return '<section class="s-section">' +
+    '<h2 class="s-section-title">' + t("section-electromaps-account") + '</h2>' +
+    '<div class="s-field-row">' +
+      field("electromaps-refreshToken", t("field-electromaps-refresh-token"),
+        input("electromaps-refreshToken", acct.refreshToken, { placeholder: "eyJ..." })) +
+    '</div>' +
+    '<span class="s-hint">' + t("electromaps-account-hint") + '</span>' +
   '</section>';
 }
 
@@ -506,6 +523,11 @@ function collectIntoState() {
       email: document.querySelector('[data-fid="evcharge-email"]').value.trim(),
       startChargeMaxM: isNaN(evMaxM) ? 10 : evMaxM
     };
+  }
+
+  var emRefreshTokenEl = document.querySelector('[data-fid="electromaps-refreshToken"]');
+  if (emRefreshTokenEl) {
+    state.electromaps = { refreshToken: emRefreshTokenEl.value.trim() };
   }
 
   document.querySelectorAll(".loc-card").forEach(function(card) {

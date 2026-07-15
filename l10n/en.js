@@ -118,6 +118,11 @@ field-evcharge-email = Email
 field-evcharge-max-start-distance = Max start distance (m)
 evcharge-max-start-distance-hint = 0 disables the button entirely
 
+## Settings — Electromaps account section (needed for the remote-start button)
+section-electromaps-account = Electromaps account
+electromaps-account-hint = Used to start a charge remotely on free Electromaps connectors. A Cognito refresh token, not a login — see adapters/electromaps.md for how to obtain one (Google-only accounts need manual re-bootstrapping once it expires).
+field-electromaps-refresh-token = Refresh token
+
 ## Settings — Locations section
 section-locations = Locations
 btn-find-nearby = Find nearby

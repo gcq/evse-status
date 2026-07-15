@@ -1,14 +1,77 @@
 var ADAPTERS = window.ADAPTERS || {};
 
 ADAPTERS.electromaps = {
-  // TODO(remote-start): evcharge got a REMOTE_START capability + isFree flag
-  // + startFreeCharge() (see adapters/evcharge.js and app.js's Start-charge
-  // button) — electromaps hasn't been investigated for the equivalent yet
-  // (does its API expose a remote-start endpoint at all, and if so, is there
-  // a free/no-payment path like evcharge's?). Still missing as of the
-  // evcharge remote-start work.
-  capabilities: ["CHARGE_START_TIME", "SEARCH_NEARBY"],
+  capabilities: ["CHARGE_START_TIME", "SEARCH_NEARBY", "REMOTE_START"],
   BASE_URL: "https://www.electromaps.com/mapi/v2",
+  BASE_URL_V1: "https://www.electromaps.com/mapi/v1",
+
+  // Cognito Hosted UI token endpoint + this app's public client ID (both
+  // baked into the APK's prodamplifyconfiguration.json — see
+  // adapters/electromaps.md's "Getting a token pair" section). No client
+  // secret: same public mobile-client flow the app itself uses.
+  TOKEN_URL: "https://idp.electromaps.com/oauth2/token",
+  CLIENT_ID: "e2582mkf7dvklnd3d91mpfrr0",
+
+  // In-memory access/id token cache, keyed by nothing (single account) —
+  // refreshed lazily whenever a call needs auth and the cache is missing or
+  // past its expiry. Never persisted: only the long-lived refreshToken is
+  // stored in Settings (config.electromaps.refreshToken), same as evcharge's
+  // account fields — see adapters/electromaps.md for how to obtain it.
+  _tokenCache: null, // { accessToken, idToken, expiresAt } or null
+
+  async _getTokens(refreshToken) {
+    if (this._tokenCache && this._tokenCache.expiresAt > Date.now()) {
+      return this._tokenCache;
+    }
+    var params = new URLSearchParams();
+    params.append("grant_type", "refresh_token");
+    params.append("client_id", this.CLIENT_ID);
+    params.append("refresh_token", refreshToken);
+    var resp = await fetch(this.TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString()
+    });
+    var data = await resp.json();
+    if (!resp.ok) throw new Error("Electromaps auth error: " + (data.error || resp.status));
+    // expires_in is seconds-until-expiry from issuance; subtract a minute of
+    // slack so a call started right before expiry doesn't race the server's
+    // own clock.
+    this._tokenCache = {
+      accessToken: data.access_token,
+      idToken: data.id_token,
+      expiresAt: Date.now() + (data.expires_in - 60) * 1000
+    };
+    return this._tokenCache;
+  },
+
+  async _authHeaders(refreshToken) {
+    var tokens = await this._getTokens(refreshToken);
+    return {
+      "X-Em-Oidc-Data": tokens.idToken,
+      "X-Em-Oidc-Accesstoken": tokens.accessToken,
+      "App-Platform": "android"
+    };
+  },
+
+  // GET mapi/v1/remote/start/{idtoma} — confirmed live in the Android app's
+  // Retrofit interface (decompiled APK, see the "Remote-start investigation"
+  // section in adapters/electromaps.md), not exposed anywhere on the web
+  // app. `idtoma` is the connector id (electromaps' "toma" = socket/outlet).
+  // `account` is { refreshToken } from settings.
+  //
+  // Unconfirmed whether the endpoint itself refuses to start a paid
+  // connector server-side — the UI-level isFree/AVAILABLE/withinStartRange
+  // gating in app.js is the only guard right now. Not called from the UI
+  // yet: same caution as evcharge's startFreeCharge(), pending exercising
+  // this against a real account before wiring the Start button's click.
+  async startFreeCharge(account, connectorId) {
+    var headers = await this._authHeaders(account.refreshToken);
+    var resp = await fetch(this.BASE_URL_V1 + "/remote/start/" + connectorId, { headers: headers });
+    var data = await resp.json();
+    if (!resp.ok || data.error) throw new Error("Electromaps error: " + (data.error || resp.status));
+    return data;
+  },
 
   async searchNearby(lat, lon, bounds) {
     var d = 0.018; // ~2 km fallback half-side when no bounds given
@@ -70,7 +133,10 @@ ADAPTERS.electromaps = {
             status: c.status,
             realtime: c.realtime,
             statusUpdatedAt: c.status_updated_at,
-            visualRef: c.visualRef
+            visualRef: c.visualRef,
+            // "FREE" | "PAYMENT" per connector, confirmed live (see
+            // adapters/electromaps.md) — mirrors evcharge's isFree flag.
+            isFree: c.cost === "FREE"
           };
         })
     };

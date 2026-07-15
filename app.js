@@ -30,6 +30,7 @@ var maxDistanceKm = null;
 // startup — see DOMContentLoaded.
 var startChargeMaxM = 10;
 var evchargeAccount = null; // { userId, cardCode, email } from config.evcharge, or null
+var electromapsAccount = null; // { refreshToken } from config.electromaps, or null
 var currentPosition = null;   // { lat, lon } once geolocation resolves, else null
 var locationDistances = [];   // meters, parallel to LOCATIONS; null = unknown
 var gpsStatus = "locating";   // "locating" | "fixed" | "unavailable" — surfaced in the header
@@ -137,6 +138,15 @@ function formatRelativeTime(isoString) {
 
 function getAdapter(cpo) {
   return window.ADAPTERS && window.ADAPTERS[cpo];
+}
+
+// The account object a REMOTE_START adapter needs for its startFreeCharge()
+// call, keyed by cpoKey — null until Settings has that CPO's account fields
+// filled in. Add a case here whenever a new adapter gains REMOTE_START.
+function accountFor(cpoKey) {
+  if (cpoKey === "evcharge") return evchargeAccount;
+  if (cpoKey === "electromaps") return electromapsAccount;
+  return null;
 }
 
 function uniq(arr) {
@@ -276,12 +286,15 @@ function renderConnector(connector, context, isOos) {
     // paid connectors, and any adapter that doesn't report pricing, opt out
     // by default), and only once you're within startChargeMaxM of the
     // location — see app.js's withinStartRange (0 disables this entirely).
-    // Shown-but-disabled when Settings > EVcharge account isn't fully filled
-    // in (evchargeAccount is only set once userId/cardCode/email are all
-    // present — see DOMContentLoaded). Note startFreeCharge() itself still
-    // isn't wired to this button's click yet even once enabled.
+    // Shown-but-disabled when that CPO's account isn't fully configured in
+    // Settings (accountFor() — evchargeAccount needs userId/cardCode/email
+    // all present; electromapsAccount needs refreshToken — see
+    // DOMContentLoaded). Note startFreeCharge() itself still isn't wired to
+    // this button's click yet even once enabled, for either adapter — see
+    // the adapters' own startFreeCharge() comments for why.
     if (context.capabilities.indexOf("REMOTE_START") >= 0 && connector.status === "AVAILABLE" && connector.isFree === true && context.withinStartRange) {
-      startBtnHtml = '<button class="btn btn-primary btn-start-charge"' + (evchargeAccount ? "" : " disabled") + '>' +
+      var hasAccount = accountFor(context.cpoKey);
+      startBtnHtml = '<button class="btn btn-primary btn-start-charge"' + (hasAccount ? "" : " disabled") + '>' +
         ICONS.bolt + '<span>' + esc(t("btn-start-charge")) + '</span>' +
       '</button>';
     }
@@ -344,6 +357,7 @@ function renderCardBody(location, index, connectors, headerButtonsHtml, extraCla
   var context = {
     rules: location.rules,
     capabilities: adapter.capabilities || [],
+    cpoKey: location.cpoKey,
     // 0 (or unset) means the feature is off — never true regardless of distance.
     withinStartRange: startChargeMaxM > 0 && dist != null && dist <= startChargeMaxM
   };
@@ -898,6 +912,7 @@ document.addEventListener("DOMContentLoaded", async function() {
       if (cfg.evcharge.startChargeMaxM != null) startChargeMaxM = cfg.evcharge.startChargeMaxM;
       if (cfg.evcharge.userId && cfg.evcharge.cardCode && cfg.evcharge.email) evchargeAccount = cfg.evcharge;
     }
+    if (cfg.electromaps && cfg.electromaps.refreshToken) electromapsAccount = cfg.electromaps;
     globalEnabled = (cfg.refresh && cfg.refresh.globalEnabled === false) ? false : true;
     flashOnAvailableEnabled = cfg.flashOnAvailable === false ? false : true;
     // Defensive: "all locations" mode and per-location auto-refresh are

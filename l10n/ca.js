@@ -118,6 +118,11 @@ field-evcharge-email = Correu electrònic
 field-evcharge-max-start-distance = Distància màxima per iniciar (m)
 evcharge-max-start-distance-hint = 0 desactiva el botó completament
 
+## Settings — Electromaps account section (needed for the remote-start button)
+section-electromaps-account = Compte d'Electromaps
+electromaps-account-hint = S'utilitza per iniciar una càrrega remotament en connectors Electromaps gratuïts. És un token de refresc de Cognito, no un inici de sessió — consulta adapters/electromaps.md per saber com obtenir-lo (els comptes només amb Google necessiten repetir el procés manualment quan caduqui).
+field-electromaps-refresh-token = Token de refresc
+
 ## Settings — Locations section
 section-locations = Ubicacions
 btn-find-nearby = Cerca a prop

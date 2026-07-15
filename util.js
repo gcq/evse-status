@@ -30,7 +30,14 @@ function defaultConfig() {
     // Not a login session — see adapters/evcharge.md for how these are obtained.
     // startChargeMaxM: how close (meters) you need to be before the Start
     // button appears on an available connector. 0 disables the button entirely.
+    // Shared across every REMOTE_START adapter (evcharge, electromaps) —
+    // one proximity threshold, not per-CPO.
     evcharge: { userId: "", cardCode: "", email: "", startChargeMaxM: 10 },
+    // Cognito refresh token for electromaps' remote-start call. Not a
+    // username/password — this account is Google-only, so the token has to
+    // be bootstrapped manually and re-bootstrapped whenever it expires from
+    // disuse. See adapters/electromaps.md's "Getting a token pair" section.
+    electromaps: { refreshToken: "" },
     locations: (typeof LOCATIONS !== "undefined")
       ? JSON.parse(JSON.stringify(LOCATIONS))
       : []
